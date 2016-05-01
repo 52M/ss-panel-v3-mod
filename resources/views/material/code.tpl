@@ -20,6 +20,7 @@
 			</div>
 		</div>
 		<div class="container">
+			<div class="col-lg-12 col-lg-push-0 col-sm-12 col-sm-push-0">
 				<section class="content-inner margin-top-no">
 				
 					<div class="card">
@@ -67,6 +68,8 @@
 					
 					
 							
+			</div>
+			
 			
 			
 		</div>
