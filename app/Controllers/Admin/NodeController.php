@@ -9,7 +9,14 @@ use App\Controllers\AdminController;
 class NodeController extends AdminController
 {
     public function index($request, $response, $args){
-        $nodes = Node::all();
+		
+		$pageNum = 1;
+        if (isset($request->getQueryParams()["page"])) {
+            $pageNum = $request->getQueryParams()["page"];
+        }
+		$nodes = Node::paginate(15, ['*'], 'page', $pageNum);
+		$nodes->setPath('/admin/node');
+		
         return $this->view()->assign('nodes',$nodes)->display('admin/node/index.tpl');
     }
 
@@ -26,6 +33,7 @@ class NodeController extends AdminController
         $node->traffic_rate = $request->getParam('rate');
         $node->info = $request->getParam('info');
         $node->type = $request->getParam('type');
+		$node->node_group = $request->getParam('group');
 		$node->node_speedlimit = $request->getParam('node_speedlimit');
         $node->status = $request->getParam('status');
 		$node->sort = $request->getParam('sort');
@@ -71,6 +79,7 @@ class NodeController extends AdminController
         $node = Node::find($id);
 
         $node->name =  $request->getParam('name');
+		$node->node_group =  $request->getParam('group');
         $node->server =  $request->getParam('server');
         $node->method =  $request->getParam('method');
         $node->custom_method =  $request->getParam('custom_method');
@@ -111,12 +120,13 @@ class NodeController extends AdminController
 
 
     public function delete($request, $response, $args){
-        $id = $args['id'];
+        $id = $request->getParam('id');
         $node = Node::find($id);
 		if($node->sort==1)
 		{
 			Radius::DelNas($node->node_ip);
 		}
+		
         if(!$node->delete()){
             $rs['ret'] = 0;
             $rs['msg'] = "删除失败";
@@ -127,15 +137,4 @@ class NodeController extends AdminController
         return $response->getBody()->write(json_encode($rs));
     }
 
-    public function deleteGet($request, $response, $args){
-        $id = $args['id'];
-        $node = Node::find($id);
-		if($node->sort==1)
-		{
-			Radius::DelNas($node->node_ip);
-		}
-        $node->delete();
-        $newResponse = $response->withStatus(302)->withHeader('Location', '/admin/node');
-        return $newResponse;
-    }
 }

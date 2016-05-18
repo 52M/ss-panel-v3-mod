@@ -7,6 +7,7 @@ use App\Services\Config;
 use App\Utils\Check;
 use App\Utils\Tools;
 use App\Utils\Radius;
+use voku\helper\AntiXSS;
 use Psr\Http\Message\ServerRequestInterface;
 use Psr\Http\Message\ResponseInterface;
 
@@ -169,13 +170,17 @@ class AuthController extends BaseController
 		$user = User::where('im_value',$wechat)->where('im_type',$imtype)->first();
         if ( $user != null) {
             $res['ret'] = 0;
-            $res['msg'] = "此微信号已经被注册了";
+            $res['msg'] = "此联络方式已经被注册了";
             return $response->getBody()->write(json_encode($res));
         }
 
         // do reg user
         $user = new User();
-        $user->user_name = $name;
+		
+		$antiXss = new AntiXSS();
+		
+		
+        $user->user_name = $antiXss->xss_clean($name);
         $user->email = $email;
         $user->pass = Hash::passwordHash($passwd);
         $user->passwd = Tools::genRandomChar(6);
@@ -184,7 +189,7 @@ class AuthController extends BaseController
         $user->u = 0;
         $user->d = 0;
 		$user->im_type =  $imtype;
-		$user->im_value =  filter_var($wechat, FILTER_SANITIZE_STRING);
+		$user->im_value =  $antiXss->xss_clean($wechat);
         $user->transfer_enable = Tools::toGB(Config::get('defaultTraffic'));
         $user->invite_num = Config::get('inviteNum');
         $user->ref_by = $c->user_id;
@@ -196,6 +201,11 @@ class AuthController extends BaseController
 		$user->plan='A';
 		$user->node_speedlimit=0;
 		$user->theme=Config::get('theme');
+		
+		$group=Config::get('ramdom_group');
+		$Garray=explode(",",$group);
+		
+		$user->node_group=$group[rand(0,count($group)-1)];
 		
 		$ga = new GA();
 		$secret = $ga->createSecret();

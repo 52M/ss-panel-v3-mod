@@ -2,11 +2,12 @@
 
 namespace App\Controllers;
 
-use App\Models\InviteCode;
 use App\Services\Auth;
-use App\Models\Node,App\Models\TrafficLog,App\Models\CheckInLog,App\Models\Ann,App\Models\Speedtest;
+use App\Models\Node,App\Models\TrafficLog,App\Models\InviteCode,App\Models\CheckInLog,App\Models\Ann,App\Models\Speedtest,App\Models\Shop,App\Models\Coupon,App\Models\Bought,App\Models\Ticket;
 use App\Services\Config;
 use App\Utils\Hash,App\Utils\Tools,App\Utils\Radius,App\Utils\Da;
+
+use voku\helper\AntiXSS;
 
 use App\Models\User;
 use App\Models\Code;
@@ -15,8 +16,10 @@ use App\Models\Smartline;
 use App\Models\LoginIp;
 use App\Models\BlockIp;
 use App\Models\UnblockIp;
+use App\Models\Payback;
 use App\Utils\QQWry;
 use App\Utils\GA;
+use App\Services\Mail;
 
 
 
@@ -84,7 +87,12 @@ class UserController extends BaseController
 		$Speedtest['Uspeed']=Speedtest::where("datetime",">",time()-6*3600)->orderBy("unicomupload","desc")->take(3);
 		$Speedtest['Cspeed']=Speedtest::where("datetime",">",time()-6*3600)->orderBy("cmccupload","desc")->take(3);*/
 		
-		$nodes=Node::where('sort', 0)->where("node_class","<=",$this->user->class)->get();
+		$nodes=Node::where('sort', 0)->where(
+			function ($query) {
+				$query->where("node_group","=",$this->user->node_group)
+					->orWhere("node_group","=",0);
+			}
+		)->where("node_class","<=",$this->user->class)->get();
 		$android_add="";
 		foreach($nodes as $node)
 		{
@@ -129,7 +137,9 @@ class UserController extends BaseController
 			}
 		}
 		
-        return $this->view()->assign('anns',$Anns)->assign("android_add",$android_add)->assign("userloginip",$userloginip)->assign("userip",$userip)->assign('duoshuo_shortname',Config::get('duoshuo_shortname'))->assign('baseUrl',Config::get('baseUrl'))->display('user/index.tpl');
+		$ios_token = LinkController::GenerateIosCode("smart",0,$this->user->id,0,"smart");
+		
+        return $this->view()->assign('anns',$Anns)->assign("ios_token",$ios_token)->assign("android_add",$android_add)->assign("userloginip",$userloginip)->assign("userip",$userip)->assign('duoshuo_shortname',Config::get('duoshuo_shortname'))->assign('baseUrl',Config::get('baseUrl'))->display('user/index.tpl');
     }
 	
 	
@@ -163,14 +173,14 @@ class UserController extends BaseController
 		
 		if ( $code == "") {
             $res['ret'] = 0;
-            $res['msg'] = "请填好兑换码";
+            $res['msg'] = "请填好充值码";
             return $response->getBody()->write(json_encode($res));
         }
 		
 		$codeq=Code::where("code","=",$code)->where("isused","=",0)->first();
         if ( $codeq == null) {
             $res['ret'] = 0;
-            $res['msg'] = "此兑换码错误";
+            $res['msg'] = "此充值码错误";
             return $response->getBody()->write(json_encode($res));
         }
 		
@@ -178,6 +188,32 @@ class UserController extends BaseController
 		$codeq->usedatetime=date("Y-m-d H:i:s");
 		$codeq->userid=$user->id;
 		$codeq->save();
+		
+		if($codeq->type==-1)
+		{
+			$user->money=($user->money+$codeq->number);
+			$user->save();
+			
+			if($user->ref_by!=""&&$user->ref_by!=0&&$user->ref_by!=NULL)
+			{
+				$gift_user=User::where("id","=",$user->ref_by)->first();
+				$gift_user->money=($gift_user->money+($codeq->number*(Config::get('code_payback')/100)));
+				$gift_user->save();
+				
+				$Payback=new Payback();
+				$Payback->total=$codeq->number;
+				$Payback->userid=$this->user->id;
+				$Payback->ref_by=$this->user->ref_by;
+				$Payback->ref_get=$codeq->number*(Config::get('code_payback')/100);
+				$Payback->datetime=time();
+				$Payback->save();
+				
+			}
+			
+			$res['ret'] = 1;
+			$res['msg'] = "充值成功，充值的金额为".$codeq->number."元。";
+			return $response->getBody()->write(json_encode($res));
+		}
 		
 		if($codeq->type==10001)
 		{
@@ -200,7 +236,7 @@ class UserController extends BaseController
 		
 		if($codeq->type>=1&&$codeq->type<=10000)
 		{
-			if($user->class==0)
+			if($user->class==0||$user->class!=$codeq->type)
 			{
 				$user->class_expire=date("Y-m-d H:i:s",time());
 				$user->save();
@@ -210,9 +246,7 @@ class UserController extends BaseController
 			$user->save();
 		}
 		
-		$res['ret'] = 1;
-		$res['msg'] = "兑换成功";
-        return $response->getBody()->write(json_encode($res));
+		
     }
 	
 	
@@ -299,7 +333,12 @@ class UserController extends BaseController
     public function node()
     {
         $user = Auth::getUser();
-        $nodes = Node::where('type', 1)->orderBy('name')->get();
+        $nodes = Node::where(
+			function ($query) {
+				$query->Where("node_group","=",$this->user->node_group)
+					->orWhere("node_group","=",0);
+			}
+		)->where('type', 1)->where("node_class","<=",$this->user->class)->orderBy('name')->get();
 		$node_prefix=Array();
 		$node_method=Array();
 		$a=0;
@@ -352,7 +391,7 @@ class UserController extends BaseController
 				}
 		
 				
-				$smt=Smartline::where("node_class",$this->user->class)->where("type",($node->id==Config::get('cloudxns_ping_nodeid')?1:0))->first();
+				$smt=Smartline::where("node_class",$this->user->class)->where("node_group","=",$this->user->node_group)->where("type",($node->id==Config::get('cloudxns_ping_nodeid')?1:0))->first();
 				
 				$node->server=$smt->domain_prefix.".".Config::get("cloudxns_prefix").".".Config::get("cloudxns_domain");
 				
@@ -361,7 +400,7 @@ class UserController extends BaseController
 				continue;
 			}
 			
-			if($user->class>=$node->node_class)
+			if($user->class>=$node->node_class&&($user->node_group==$node->node_group||$node->node_group==0)&&($node->node_bandwidth_limit==0||$node->node_bandwidth<$node->node_bandwidth_limit))
 			{
 				$temp=explode(" - ",$node->name);
 				if(!isset($node_prefix[$temp[0]]))
@@ -438,14 +477,14 @@ class UserController extends BaseController
 		switch ($node->sort) { 
 
 			case 0: 
-				if($user->class>=$node->node_class)
+				if($user->class>=$node->node_class&&($user->node_group==$node->node_group||$node->node_group==0)&&($node->node_bandwidth_limit==0||$node->node_bandwidth<$node->node_bandwidth_limit))
 				{
 					$ary['server'] = $node->server;
 					
 					
 					if(($node->id==Config::get('cloudxns_ping_nodeid')||$node->id==Config::get('cloudxns_speed_nodeid'))&&Config::get('cloudxns_apikey')!="")
 					{
-						$smt=Smartline::where("node_class",$this->user->class)->where("type",($node->id==Config::get('cloudxns_ping_nodeid')?1:0))->first();
+						$smt=Smartline::where("node_class",$this->user->class)->where("node_group","=",$this->user->node_group)->where("type",($node->id==Config::get('cloudxns_ping_nodeid')?1:0))->first();
 						$ary['server']=$smt->domain_prefix.".".Config::get("cloudxns_prefix").".".Config::get("cloudxns_domain");
 					}
 					
@@ -467,12 +506,12 @@ class UserController extends BaseController
 					$surge_proxy = "#!PROXY-OVERRIDE:ProxyBase.conf\n";
 					$surge_proxy .= "[Proxy]\n";
 					$surge_proxy .= "Proxy = custom," . $ary['server'] . "," . $ary['server_port'] . "," . $ary['method'] . "," . $ary['password'] . "," . Config::get('baseUrl') . "/downloads/SSEncrypt.module";
-					return $this->view()->assign('ary', $ary)->assign('json', $json)->assign('link1',Config::get('baseUrl')."/link/".$token_1)->assign('link2',Config::get('baseUrl')."/link/".$token_2)->assign('global_url',Config::get('baseUrl')."/downloads")->assign('json_show', $json_show)->assign('ssqr', $ssqr)->assign('surge_base', $surge_base)->assign('surge_proxy', $surge_proxy)->assign('info_server', $ary['server'])->assign('info_port', $this->user->port)->assign('info_method', $ary['method'])->assign('info_pass', $this->user->passwd)->display('user/nodeinfo.tpl');
+					return $this->view()->assign('ary', $ary)->assign('json', $json)->assign('link1',Config::get('baseUrl')."/link/".$token_1)->assign('link2',Config::get('baseUrl')."/link/".$token_2)->assign('json_show', $json_show)->assign('ssqr', $ssqr)->assign('surge_base', $surge_base)->assign('surge_proxy', $surge_proxy)->assign('info_server', $ary['server'])->assign('info_port', $this->user->port)->assign('info_method', $ary['method'])->assign('info_pass', $this->user->passwd)->display('user/nodeinfo.tpl');
 				}
 			break; 
 
 			case 1: 
-				if($user->class>=$node->node_class)
+				if($user->class>=$node->node_class&&($user->node_group==$node->node_group||$node->node_group==0))
 				{
 						
 					$email=$this->user->email;
@@ -484,7 +523,7 @@ class UserController extends BaseController
 			break; 
 
 			case 2: 
-				if($user->class>=$node->node_class)
+				if($user->class>=$node->node_class&&($user->node_group==$node->node_group||$node->node_group==0))
 				{
 					$email=$this->user->email;
 					$email=Radius::GetUserName($email);
@@ -498,7 +537,7 @@ class UserController extends BaseController
 
 
 			case 3: 
-				if($user->class>=$node->node_class)
+				if($user->class>=$node->node_class&&($user->node_group==$node->node_group||$node->node_group==0))
 				{
 
 					$email=$this->user->email;
@@ -514,7 +553,7 @@ class UserController extends BaseController
 			break; 
 
 			case 4: 
-				if($user->class>=$node->node_class)
+				if($user->class>=$node->node_class&&($user->node_group==$node->node_group||$node->node_group==0))
 				{
 					$email=$this->user->email;
 					$email=Radius::GetUserName($email);
@@ -527,7 +566,7 @@ class UserController extends BaseController
 			break; 
 
 			case 5: 
-				if($user->class>=$node->node_class)
+				if($user->class>=$node->node_class&&($user->node_group==$node->node_group||$node->node_group==0))
 				{
 					$email=$this->user->email;
 					$email=Radius::GetUserName($email);
@@ -541,7 +580,7 @@ class UserController extends BaseController
 			break; 
 
 			case 6: 
-				if($user->class>=$node->node_class)
+				if($user->class>=$node->node_class&&($user->node_group==$node->node_group||$node->node_group==0))
 				{
 					$email=$this->user->email;
 					$email=Radius::GetUserName($email);
@@ -560,7 +599,7 @@ class UserController extends BaseController
 			break; 
 
 			case 7: 
-				if($user->class>=$node->node_class)
+				if($user->class>=$node->node_class&&($user->node_group==$node->node_group||$node->node_group==0))
 				{
 					$email=$this->user->email;
 					$email=Radius::GetUserName($email);
@@ -575,7 +614,7 @@ class UserController extends BaseController
 			break; 
 
 			case 8: 
-				if($user->class>=$node->node_class)
+				if($user->class>=$node->node_class&&($user->node_group==$node->node_group||$node->node_group==0))
 				{
 					$email=$this->user->email;
 					$email=Radius::GetUserName($email);
@@ -608,21 +647,38 @@ class UserController extends BaseController
 	public function GetPcConf($request, $response, $args){
         
         $newResponse = $response->withHeader('Content-type', ' application/octet-stream')->withHeader('Content-Disposition', ' attachment; filename=gui-config.json');//->getBody()->write($builder->output());
-        $newResponse->getBody()->write(LinkController::GetPcConf(Node::where('sort', 0)->where("node_class","<=",$this->user->class)->get(),$this->user));
+        $newResponse->getBody()->write(LinkController::GetPcConf(Node::where('sort', 0)->where("id","<>",Config::get('cloudxns_ping_nodeid'))->where("id","<>",Config::get('cloudxns_speed_nodeid'))->where(
+			function ($query) {
+				$query->where("node_group","=",$this->user->node_group)
+					->orWhere("node_group","=",0);
+			}
+		)->where("node_class","<=",$this->user->class)->get(),$this->user));
         return $newResponse;
     }
 	
 	public function GetIosConf($request, $response, $args){
         
         $newResponse = $response->withHeader('Content-type', ' application/octet-stream')->withHeader('Content-Disposition', ' attachment; filename=allinone.conf');//->getBody()->write($builder->output());
-        $newResponse->getBody()->write(LinkController::GetIosConf(Node::where('sort', 0)->where("node_class","<=",$this->user->class)->get(),$this->user));
+        $newResponse->getBody()->write(LinkController::GetIosConf(Node::where('sort', 0)->where("id","<>",Config::get('cloudxns_ping_nodeid'))->where("id","<>",Config::get('cloudxns_speed_nodeid'))->where(
+			function ($query) {
+				$query->where("node_group","=",$this->user->node_group)
+					->orWhere("node_group","=",0);
+			}
+		)->where("node_class","<=",$this->user->class)->get(),$this->user));
         return $newResponse;
     }
 	
 
-    public function profile()
+    public function profile($request, $response, $args)
     {
-        return $this->view()->display('user/profile.tpl');
+		$pageNum = 1;
+        if (isset($request->getQueryParams()["page"])) {
+            $pageNum = $request->getQueryParams()["page"];
+        }
+		$paybacks = Payback::where("ref_by",$this->user->id)->orderBy("datetime","desc")->paginate(15, ['*'], 'page', $pageNum);
+		$paybacks->setPath('/user/profile');
+		
+        return $this->view()->assign("paybacks",$paybacks)->display('user/profile.tpl');
     }
 
     public function edit($request, $response, $args)
@@ -645,9 +701,18 @@ class UserController extends BaseController
     }
 
 
-    public function invite()
+    public function invite($request, $response, $args)
     {
-        $codes = $this->user->inviteCodes();
+		
+		$pageNum = 1;
+        if (isset($request->getQueryParams()["page"])) {
+            $pageNum = $request->getQueryParams()["page"];
+        }
+		$codes=InviteCode::where('user_id', $this->user->id)->orderBy("created_at","desc")->paginate(15, ['*'], 'page', $pageNum);
+		$codes->setPath('/user/invite');
+		
+		
+		
         return $this->view()->assign('codes', $codes)->display('user/invite.tpl');
     }
 
@@ -656,6 +721,7 @@ class UserController extends BaseController
         $n = $this->user->invite_num;
         if ($n < 1) {
             $res['ret'] = 0;
+			$res['msg'] = "失败";
             return $response->getBody()->write(json_encode($res));
         }
         for ($i = 0; $i < $n; $i++) {
@@ -668,6 +734,7 @@ class UserController extends BaseController
         $this->user->invite_num = 0;
         $this->user->save();
         $res['ret'] = 1;
+		$res['msg'] = "生成成功。";
         return $this->echoJson($response, $res);
     }
 
@@ -728,6 +795,369 @@ class UserController extends BaseController
         $res['ret'] = 1;
         $res['msg'] = "解封 "+$_SERVER["REMOTE_ADDR"]+" 成功";
         return $this->echoJson($response, $res);
+    }
+	
+	public function shop($request, $response, $args){
+        $pageNum = 1;
+        if (isset($request->getQueryParams()["page"])) {
+            $pageNum = $request->getQueryParams()["page"];
+        }
+		$shops = Shop::where("status",1)->paginate(15, ['*'], 'page', $pageNum);
+		$shops->setPath('/user/shop');
+		
+        return $this->view()->assign('shops',$shops)->display('user/shop.tpl');
+    }
+	
+	public function CouponCheck($request, $response, $args)
+    {
+        $coupon = $request->getParam('coupon');
+        $shop = $request->getParam('shop');
+		
+		$shop=Shop::where("id",$shop)->where("status",1)->first();
+		
+		if($shop==null)
+		{
+			$res['ret'] = 0;
+            $res['msg'] = "非法请求";
+            return $response->getBody()->write(json_encode($res));
+		}
+		
+		if($coupon=="")
+		{
+			$res['ret'] = 1;
+			$res['name'] = $shop->name;
+			$res['credit'] = "0 %";
+			$res['total'] = $shop->price."元";
+			return $response->getBody()->write(json_encode($res));
+		}
+		
+		$coupon=Coupon::where("code",$coupon)->first();
+		
+		if($coupon==null)
+		{
+			$res['ret'] = 0;
+            $res['msg'] = "优惠码无效";
+            return $response->getBody()->write(json_encode($res));
+		}
+		
+		if($coupon->order($shop->id)==FALSE)
+		{
+			$res['ret'] = 0;
+            $res['msg'] = "此优惠码不可用于此商品";
+            return $response->getBody()->write(json_encode($res));
+		}
+		
+		$res['ret'] = 1;
+		$res['name'] = $shop->name;
+		$res['credit'] = $coupon->credit." %";
+		$res['total'] = $shop->price*((100-$coupon->credit)/100)."元";
+		
+		return $response->getBody()->write(json_encode($res));
+    }
+	
+	public function buy($request, $response, $args)
+    {
+        $coupon = $request->getParam('coupon');
+		$code = $coupon;
+        $shop = $request->getParam('shop');
+		
+		$autorenew = $request->getParam('autorenew');
+		
+		$shop=Shop::where("id",$shop)->where("status",1)->first();
+		
+		if($shop==null)
+		{
+			$res['ret'] = 0;
+            $res['msg'] = "非法请求";
+            return $response->getBody()->write(json_encode($res));
+		}
+		
+		if($coupon=="")
+		{
+			$credit=0;
+		}
+		else
+		{
+		
+			$coupon=Coupon::where("code",$coupon)->first();
+			
+			if($coupon==null)
+			{
+				$credit=0;
+			}
+			else
+			{
+				$credit=$coupon->credit;
+			}
+			
+			if($coupon->order($shop->id)==FALSE)
+			{
+				$res['ret'] = 0;
+				$res['msg'] = "此优惠码不可用于此商品";
+				return $response->getBody()->write(json_encode($res));
+			}
+			
+			if($coupon->expire<time())
+			{
+				$res['ret'] = 0;
+				$res['msg'] = "此优惠码已过期";
+				return $response->getBody()->write(json_encode($res));
+			}
+		}
+		
+		$price=$shop->price*((100-$credit)/100);
+		$user=$this->user;
+		if($user->money<$price)
+		{
+			$res['ret'] = 0;
+			$res['msg'] = "余额不足";
+			return $response->getBody()->write(json_encode($res));
+		}
+		
+		$user->money=$user->money-$price;
+		$user->save();
+		
+		$bought=new Bought();
+		$bought->userid=$user->id;
+		$bought->shopid=$shop->id;
+		$bought->datetime=time();
+		if($autorenew==0||$shop->auto_renew==0)
+		{
+			$bought->renew=0;
+		}
+		else
+		{
+			$bought->renew=time()+$shop->auto_renew*86400;
+		}
+		
+		$bought->coupon=$code;
+		if($coupon->onetime==1)
+		{
+			$price=$shop->price;
+		}
+		
+		$bought->price=$price;
+		$bought->save();
+		
+		$shop->buy($user);
+		
+		$res['ret'] = 1;
+        $res['msg'] = "购买成功";
+		
+		return $response->getBody()->write(json_encode($res));
+    }
+	
+	public function bought($request, $response, $args){
+        $pageNum = 1;
+        if (isset($request->getQueryParams()["page"])) {
+            $pageNum = $request->getQueryParams()["page"];
+        }
+		$shops = Bought::where("userid",$this->user->id)->orderBy("id","desc")->paginate(15, ['*'], 'page', $pageNum);
+		$shops->setPath('/user/bought');
+		
+        return $this->view()->assign('shops',$shops)->display('user/bought.tpl');
+    }
+	
+	public function deleteBoughtGet($request, $response, $args){
+        $id = $request->getParam('id');
+        $shop = Bought::where("id",$id)->where("userid",$this->user->id)->get;
+		
+		if($shop==null)
+		{
+			$rs['ret'] = 0;
+            $rs['msg'] = "退订失败";
+            return $response->getBody()->write(json_encode($rs));
+		}
+		
+		if($this->user->id==$shop->userid)
+		{
+			$shop->renew=0;
+		}
+		
+        if(!$shop->save()){
+            $rs['ret'] = 0;
+            $rs['msg'] = "退订失败";
+            return $response->getBody()->write(json_encode($rs));
+        }
+        $rs['ret'] = 1;
+        $rs['msg'] = "退订成功";
+		return $response->getBody()->write(json_encode($rs));
+    }
+	
+	
+	public function ticket($request, $response, $args){
+        $pageNum = 1;
+        if (isset($request->getQueryParams()["page"])) {
+            $pageNum = $request->getQueryParams()["page"];
+        }
+		$tickets = Ticket::where("userid",$this->user->id)->where("rootid",0)->orderBy("datetime","desc")->paginate(15, ['*'], 'page', $pageNum);
+		$tickets->setPath('/user/ticket');
+		
+        return $this->view()->assign('tickets',$tickets)->display('user/ticket.tpl');
+    }
+	
+	public function ticket_create($request, $response, $args){
+		
+        return $this->view()->display('user/ticket_create.tpl');
+    }
+	
+	public function ticket_add($request, $response, $args){
+        $title = $request->getParam('title');
+		$content = $request->getParam('content');
+		
+		
+		if($title==""||$content=="")
+		{
+			$res['ret'] = 0;
+			$res['msg'] = "请填全";
+			return $this->echoJson($response, $res);
+		}
+		
+		if(strpos($content,"admin")!=FALSE||strpos($content,"user")!=FALSE)
+		{
+			$res['ret'] = 0;
+			$res['msg'] = "请求中有不正当的词语。";
+			return $this->echoJson($response, $res);
+		}
+		
+        
+        $ticket=new Ticket();
+		
+		$antiXss = new AntiXSS();
+		
+		$ticket->title=$antiXss->xss_clean($title);
+		$ticket->content=$antiXss->xss_clean($content);
+		$ticket->rootid=0;
+		$ticket->userid=$this->user->id;
+		$ticket->datetime=time();
+		$ticket->save();
+		
+		$adminUser = User::where("is_admin","=","1")->get();
+		foreach($adminUser as $user)
+		{
+			$subject = Config::get('appName')."-新工单被开启";
+			$to = $user->email;
+			$text = "管理员您好，有人开启了新的工单，请您及时处理。。" ;
+			try {
+				Mail::send($to, $subject, 'news/warn.tpl', [
+					"user" => $user,"text" => $text
+				], [
+				]);
+			} catch (Exception $e) {
+				echo $e->getMessage();
+			}
+		}
+
+        $res['ret'] = 1;
+        $res['msg'] = "提交成功";
+        return $this->echoJson($response, $res);
+    }
+	
+	public function ticket_update($request, $response, $args){
+        $id = $args['id'];
+		$content = $request->getParam('content');
+		$status = $request->getParam('status');
+		
+		if($content==""||$status=="")
+		{
+			$res['ret'] = 0;
+			$res['msg'] = "请填全";
+			return $this->echoJson($response, $res);
+		}
+		
+		if(strpos($content,"admin")!=FALSE||strpos($content,"user")!=FALSE)
+		{
+			$res['ret'] = 0;
+			$res['msg'] = "请求中有不正当的词语。";
+			return $this->echoJson($response, $res);
+		}
+		
+        
+        $ticket_main=Ticket::where("id","=",$id)->where("rootid","=",0)->first();
+		if($ticket_main->userid!=$this->user->id)
+		{
+			$newResponse = $response->withStatus(302)->withHeader('Location', '/user/ticket');
+			return $newResponse;
+		}
+		
+		if($status==1&&$ticket_main->status!=$status)
+		{
+			$adminUser = User::where("is_admin","=","1")->get();
+			foreach($adminUser as $user)
+			{
+				$subject = Config::get('appName')."-工单被重新开启";
+				$to = $user->email;
+				$text = "管理员您好，有人重新开启了<a href=\"".Config::get('baseUrl')."/admin/ticket/".$ticket_main->id."/view\">工单</a>，请您及时处理。" ;
+				try {
+					Mail::send($to, $subject, 'news/warn.tpl', [
+						"user" => $user,"text" => $text
+					], [
+					]);
+				} catch (Exception $e) {
+					echo $e->getMessage();
+				}
+			}
+		}
+		else
+		{
+			$adminUser = User::where("is_admin","=","1")->get();
+			foreach($adminUser as $user)
+			{
+				$subject = Config::get('appName')."-工单被回复";
+				$to = $user->email;
+				$text = "管理员您好，有人回复了<a href=\"".Config::get('baseUrl')."/admin/ticket/".$ticket_main->id."/view\">工单</a>，请您及时处理。" ;
+				try {
+					Mail::send($to, $subject, 'news/warn.tpl', [
+						"user" => $user,"text" => $text
+					], [
+					]);
+				} catch (Exception $e) {
+					echo $e->getMessage();
+				}
+			}
+		}
+		
+		$antiXss = new AntiXSS();
+		
+		$ticket=new Ticket();
+		$ticket->title=$antiXss->xss_clean($ticket_main->title);
+		$ticket->content=$antiXss->xss_clean($content);
+		$ticket->rootid=$ticket_main->id;
+		$ticket->userid=$this->user->id;
+		$ticket->datetime=time();
+		$ticket_main->status=$status;
+		
+		$ticket_main->save();
+		$ticket->save();
+		
+		
+		
+
+        $res['ret'] = 1;
+        $res['msg'] = "提交成功";
+        return $this->echoJson($response, $res);
+    }
+	
+	public function ticket_view($request, $response, $args){
+		$id = $args['id'];
+		$ticket_main=Ticket::where("id","=",$id)->where("rootid","=",0)->first();
+		if($ticket_main->userid!=$this->user->id)
+		{
+			$newResponse = $response->withStatus(302)->withHeader('Location', '/user/ticket');
+			return $newResponse;
+		}
+		
+		$pageNum = 1;
+        if (isset($request->getQueryParams()["page"])) {
+            $pageNum = $request->getQueryParams()["page"];
+        }
+		
+		
+		$ticketset=Ticket::where("id",$id)->orWhere("rootid","=",$id)->orderBy("datetime","desc")->paginate(5, ['*'], 'page', $pageNum);
+		$ticketset->setPath('/user/ticket/'.$id."/view");
+		
+		
+		return $this->view()->assign('ticketset',$ticketset)->assign("id",$id)->display('user/ticket_view.tpl');
     }
 	
 	public function updateWechat($request, $response, $args)

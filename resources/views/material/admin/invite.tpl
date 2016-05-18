@@ -15,11 +15,10 @@
 	<main class="content">
 		<div class="content-header ui-content-header">
 			<div class="container">
-				<h1 class="content-heading">邀请码</h1>
+				<h1 class="content-heading">邀请</h1>
 			</div>
 		</div>
 		<div class="container">
-			<div class="col-lg-6 col-lg-push-3 col-sm-10 col-sm-push-1">
 				<section class="content-inner margin-top-no">
 				
 					<div class="card">
@@ -40,7 +39,7 @@
 								</div>
 								
 								<div class="form-group form-group-label">
-									<label class="floating-label" for="uid">邀请码类别(0为公开，其他数字为对应用户的UID)</label>
+									<label class="floating-label" for="uid">邀请码类别(0为公开，其他数字为对应用户的UI，或者输入用户的完整邮箱)</label>
 									<input class="form-control" id="uid" type="text">
 								</div>
 								
@@ -50,13 +49,47 @@
 								</div>
 								
 								
-								<div class="form-group">
-									<div class="row">
-										<div class="col-md-10 col-md-push-1">
-											<button id="invite" type="submit" class="btn btn-block btn-brand waves-attach waves-light">生成</button>
+							</div>
+							
+							<div class="card-action">
+								<div class="card-action-btn pull-left">
+									<a class="btn btn-flat waves-attach" id="invite" ><span class="icon">check</span>&nbsp;生成</a>
+								</div>
+							</div>
+						</div>
+					</div>
+					
+					<div class="card margin-bottom-no">
+						<div class="card-main">
+							<div class="card-inner">
+								<p class="card-heading">返利记录</p>
+									<div class="card-table">
+										<div class="table-responsive">
+											{$paybacks->render()}
+											<table class="table">
+												<thead>
+												<tr>
+													<th>###</th>
+													<th>返利用户</th>
+													<th>返利金额</th>
+												</tr>
+												</thead>
+												<tbody>
+												{foreach $paybacks as $payback}
+													<tr>
+														<td><b>{$payback->id}</b></td>
+														<td>{$payback->user()->user_name}
+														</td>
+														<td>{$payback->ref_get} 元</td>
+													</tr>
+												{/foreach}
+												</tbody>
+											</table>
+											{$paybacks->render()}
 										</div>
 									</div>
-								</div>
+								
+								
 							</div>
 						</div>
 					</div>
@@ -68,7 +101,6 @@
 			
 			
 			
-		</div>
 	</main>
 
 
@@ -89,8 +121,7 @@
 
 
 <script>
-    $(document).ready(function () {
-        $("#invite").click(function () {
+    $("#invite").click(function () {
             $.ajax({
                 type: "POST",
                 url: "/admin/invite",
@@ -105,7 +136,13 @@
                         $("#result").modal();
                         $("#msg").html(data.msg+"  五秒后跳转。");
                         window.setTimeout("location.href='/admin/invite'", 5000);
-                    }
+					}
+                    else
+					{
+						$("#result").modal();
+                        $("#msg").html(data.msg+"。");
+					}
+					
                     // window.location.reload();
                 },
                 error: function (jqXHR) {
@@ -113,6 +150,5 @@
                 }
             })
         })
-    })
 </script>
 

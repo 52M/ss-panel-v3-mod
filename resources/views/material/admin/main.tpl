@@ -12,6 +12,7 @@
 	<!-- css -->
 	<link href="/theme/material/css/base.min.css" rel="stylesheet">
 	<link href="/theme/material/css/project.min.css" rel="stylesheet">
+	<link href="https://fonts.lug.ustc.edu.cn/icon?family=Material+Icons" rel="stylesheet">
 	
 
 	
@@ -205,7 +206,7 @@
 					</a>
 					<ul class="dropdown-menu dropdown-menu-right">
 						<li>
-							<a class="padding-right-lg waves-attach" href="/auth/login"><span class="icon icon-lg margin-right">account_box</span>登陆</a>
+							<a class="padding-right-lg waves-attach" href="/auth/login"><span class="icon icon-lg margin-right">account_box</span>登录</a>
 						</li>
 						<li>
 							<a class="padding-right-lg waves-attach" href="/auth/register"><span class="icon icon-lg margin-right">pregnant_woman</span>注册</a>
@@ -224,14 +225,18 @@
 					<li><a href="/admin"><i class="icon icon-lg">business_center</i>&nbsp;管理中心</a></li>
 					<li><a href="/admin/node"><i class="icon icon-lg">router</i>&nbsp;节点管理</a></li>
 					<li><a href="/admin/announcement"><i class="icon icon-lg">announcement</i>&nbsp;公告管理</a></li>
-					<li><a href="/admin/code"><i class="icon icon-lg">code</i>&nbsp;兑换码管理</a></li>
+					<li><a href="/admin/code"><i class="icon icon-lg">code</i>&nbsp;充值码管理</a></li>
 					<li><a href="/admin/user"><i class="icon icon-lg">verified_user</i>&nbsp;用户管理</a></li>
-					<li><a href="/admin/invite"><i class="icon icon-lg">loyalty</i>&nbsp;邀请管理</a></li>
+					<li><a href="/admin/invite"><i class="icon icon-lg">loyalty</i>&nbsp;邀请与返利管理</a></li>
+					<li><a href="/admin/shop"><i class="icon icon-lg">shop</i>&nbsp;商品管理</a></li>
+					<li><a href="/admin/coupon"><i class="icon icon-lg">card_giftcard</i>&nbsp;优惠码管理</a></li>
+					<li><a href="/admin/bought"><i class="icon icon-lg">shopping_cart</i>&nbsp;购买记录</a></li>
 					<li><a href="/admin/trafficlog"><i class="icon icon-lg">traffic</i>&nbsp;流量记录</a></li>
 					<li><a href="/admin/alive"><i class="icon icon-lg">dialer_sip</i>&nbsp;在线IP</a></li>
 					<li><a href="/admin/block"><i class="icon icon-lg">dialer_sip</i>&nbsp;节点被封IP</a></li>
 					<li><a href="/admin/unblock"><i class="icon icon-lg">dialer_sip</i>&nbsp;解封IP记录</a></li>
-					<li><a href="/admin/login"><i class="icon icon-lg">text_fields</i>&nbsp;登陆记录</a></li>
+					<li><a href="/admin/login"><i class="icon icon-lg">text_fields</i>&nbsp;登录记录</a></li>
+					<li><a href="/admin/ticket"><i class="icon icon-lg">question_answer</i>&nbsp;工单</a></li>
 					<li><a href="/user"><i class="icon icon-lg">person</i>&nbsp;用户中心</a></li>
 					<li><a href="/user/logout"><i class="icon icon-lg">call_missed_outgoing</i>&nbsp;退出</a></li>
 				</ul>

@@ -85,7 +85,7 @@
 							<div class="card">
 								<div class="card-main">
 									<div class="card-inner margin-bottom-no">
-										<p class="card-heading">最近10次登陆IP</p>
+										<p class="card-heading">最近10次登录IP</p>
 										<p>请确认都为自己的IP，如有异常请及时修改密码。</p>
 										<div class="card-table">
 											<div class="table-responsive">
@@ -133,7 +133,7 @@
 										<p>这里为您提供了自动化地配置文件生成，包含了所有 Shadowsocks 服务器的信息，方便您在诸多的服务器中快速添加，快速切换。</p>
 										<p><a href="/downloads/client/ShadowsocksR-win.7z"><i class="icon icon-lg">desktop_windows</i>&nbsp;Windows下载这个</a>，解压，然后下载<a href="/user/getpcconf">这个</a>，放到程序目录下，运行程序，选择一个合适的服务器，更新一下PAC为绕过国内IP，然后开启系统代理即可上网。</p>
 										<!--<p><a href="/downloads/client/ShadowsocksX.dmg"><i class="icon icon-lg">laptop_mac</i>&nbsp;Mac OS X下载这个</a>，安装，然后下载<a href="/user/getpcconf">这个</a>，放到程序目录下，运行程序，选择一个合适的服务器，更新一下PAC，然后开启系统代理即可上网。</p>-->
-										<p><i class="icon icon-lg">laptop_mac</i>&nbsp;iOS 下载<a href="/user/getiosconf">这个</a>，导入到 Surge 中，然后就可以随意切换服务器上网了。</p>
+										<p><i class="icon icon-lg">laptop_mac</i>&nbsp;iOS 下载<a href="/link/{$ios_token}">这个</a>，导入到 Surge 中，然后就可以随意切换服务器上网了。</p>
 										<p><a href="/downloads/client/shadowsocks.apk"><i class="icon icon-lg">android</i>&nbsp;Android下载这个</a>，安装，然后在手机上默认浏览器中点击<a id="android_add">这个</a>，然后一直点击确定，批量添加完服务器，然后路由选择绕过大陆，右上角开启就可以上网了。(此方法还在测试中，可能会出现问题)</p>
 									</div>
 									
@@ -209,7 +209,7 @@
 								<div class="card-main">
 									<div class="card-inner margin-bottom-no">
 										<p class="card-heading">续命获取流量</p>
-											<p> 每天可以续命一次。</p>
+											<p>每天可以续命一次。您可以点击按钮或者摇动手机来续命。</p>
 
 											<p>上次续命时间：<code>{$user->lastCheckInTime()}</code></p>
 											
@@ -302,6 +302,43 @@
 
 
 {include file='user/footer.tpl'}
+
+<script src="theme/material/js/shake.js/shake.js"></script>
+<script>
+window.onload = function() { 
+    var myShakeEvent = new Shake({ 
+        threshold: 15 
+    }); 
+ 
+    myShakeEvent.start(); 
+ 
+    window.addEventListener('shake', shakeEventDidOccur, false); 
+ 
+    function shakeEventDidOccur () { 
+		if("vibrate" in navigator){
+			navigator.vibrate(500);
+		}
+		
+        $.ajax({
+                type: "POST",
+                url: "/user/checkin",
+                dataType: "json",
+                success: function (data) {
+                    $("#checkin-msg").html(data.msg);
+                    $("#checkin-btn").hide();
+					$("#result").modal();
+                    $("#msg").html(data.msg);
+                },
+                error: function (jqXHR) {
+					$("#result").modal();
+                    $("#msg").html("发生错误：" + jqXHR.status);
+                }
+            });
+    } 
+}; 
+
+</script>
+
 
 
 <script>

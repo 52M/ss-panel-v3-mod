@@ -12,6 +12,7 @@
 	<!-- css -->
 	<link href="/theme/material/css/base.min.css" rel="stylesheet">
 	<link href="/theme/material/css/project.min.css" rel="stylesheet">
+	<link href="https://fonts.lug.ustc.edu.cn/icon?family=Material+Icons" rel="stylesheet">
 	
 
 	
@@ -218,7 +219,7 @@
 					</a>
 					<ul class="dropdown-menu dropdown-menu-right">
 						<li>
-							<a class="padding-right-lg waves-attach" href="/auth/login"><span class="icon icon-lg margin-right">account_box</span>登陆</a>
+							<a class="padding-right-lg waves-attach" href="/auth/login"><span class="icon icon-lg margin-right">account_box</span>登录</a>
 						</li>
 						<li>
 							<a class="padding-right-lg waves-attach" href="/auth/register"><span class="icon icon-lg margin-right">pregnant_woman</span>注册</a>
@@ -248,7 +249,7 @@
 
 					<li>
 						<a href="/user/profile">
-							<i class="icon icon-lg">info</i>&nbsp;我的信息
+							<i class="icon icon-lg">info</i>&nbsp;我的账户
 						</a>
 					</li>
 
@@ -271,12 +272,25 @@
 						</a>
 					</li>
 					{/if}
+					
+					<li>
+						<a href="/user/shop">
+							<i class="icon icon-lg">shop</i>&nbsp;商店
+						</a>
+					</li>
+					
+					<li><a href="/user/bought"><i class="icon icon-lg">shopping_cart</i>&nbsp;购买记录</a></li>
+					
+					
+
 
 					<li>
 						<a href="/user/code">
-							<i class="icon icon-lg">code</i>&nbsp;兑换码
+							<i class="icon icon-lg">code</i>&nbsp;充值
 						</a>
 					</li>
+					
+					<li><a href="/user/ticket"><i class="icon icon-lg">question_answer</i>&nbsp;工单</a></li>
 
 
 					<li>
@@ -287,7 +301,7 @@
 
 					<li>
 						<a href="/user/invite">
-							<i class="icon icon-lg">loyalty</i>&nbsp;邀请好友
+							<i class="icon icon-lg">loyalty</i>&nbsp;邀请
 						</a>
 					</li>
 

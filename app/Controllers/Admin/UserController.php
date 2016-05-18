@@ -14,7 +14,7 @@ class UserController extends AdminController
         if(isset($request->getQueryParams()["page"])){
             $pageNum = $request->getQueryParams()["page"];
         }
-        $users = User::paginate(60,['*'],'page',$pageNum);
+        $users = User::paginate(20,['*'],'page',$pageNum);
         $users->setPath('/admin/user');
 		
 		
@@ -55,6 +55,106 @@ class UserController extends AdminController
 		
         return $this->view()->assign('users',$users)->assign("regloc",$regloc)->assign("useripcount",$useripcount)->assign("userip",$userip)->display('admin/user/index.tpl');
     }
+	
+	public function search($request, $response, $args){
+        $pageNum = 1;
+		$text=$args["text"];
+        if(isset($request->getQueryParams()["page"])){
+            $pageNum = $request->getQueryParams()["page"];
+        }
+		
+		$users = User::where("email","LIKE","%".$text."%")->orWhere("user_name","LIKE","%".$text."%")->orWhere("im_value","LIKE","%".$text."%")->paginate(20,['*'],'page',$pageNum);
+        $users->setPath('/admin/user/search/'.$text);
+		
+		
+
+		//Ip::where("datetime","<",time()-90)->get()->delete();
+		$total = Ip::where("datetime",">=",time()-90)->orderBy('userid', 'desc')->get();
+		
+		
+		$userip=array();
+		$useripcount=array();
+		$regloc=array();
+		
+		$iplocation = new QQWry(); 
+		foreach($users as $user)
+		{
+			$useripcount[$user->id]=0;
+			$userip[$user->id]=array();
+			
+			$location=$iplocation->getlocation($user->reg_ip);
+			$regloc[$user->id]=iconv('gbk', 'utf-8//IGNORE', $location['country'].$location['area']);
+		}
+		
+		  
+		
+		foreach($total as $single)
+		{
+			if(isset($useripcount[$single->userid]))
+			{
+				if(!isset($userip[$single->userid][$single->ip]))
+				{
+					$useripcount[$single->userid]=$useripcount[$single->userid]+1;
+					$location=$iplocation->getlocation($single->ip);
+					$userip[$single->userid][$single->ip]=iconv('gbk', 'utf-8//IGNORE', $location['country'].$location['area']);
+				}
+			}
+		}
+
+		
+        return $this->view()->assign('users',$users)->assign("regloc",$regloc)->assign("useripcount",$useripcount)->assign("userip",$userip)->display('admin/user/index.tpl');
+    }
+	
+	public function sort($request, $response, $args){
+        $pageNum = 1;
+		$text=$args["text"];
+		$asc=$args["asc"];
+        if(isset($request->getQueryParams()["page"])){
+            $pageNum = $request->getQueryParams()["page"];
+        }
+		
+		
+        $users->setPath('/admin/user/sort/'.$text."/".$asc);
+		
+		
+
+		//Ip::where("datetime","<",time()-90)->get()->delete();
+		$total = Ip::where("datetime",">=",time()-90)->orderBy('userid', 'desc')->get();
+		
+		
+		$userip=array();
+		$useripcount=array();
+		$regloc=array();
+		
+		$iplocation = new QQWry(); 
+		foreach($users as $user)
+		{
+			$useripcount[$user->id]=0;
+			$userip[$user->id]=array();
+			
+			$location=$iplocation->getlocation($user->reg_ip);
+			$regloc[$user->id]=iconv('gbk', 'utf-8//IGNORE', $location['country'].$location['area']);
+		}
+		
+		  
+		
+		foreach($total as $single)
+		{
+			if(isset($useripcount[$single->userid]))
+			{
+				if(!isset($userip[$single->userid][$single->ip]))
+				{
+					$useripcount[$single->userid]=$useripcount[$single->userid]+1;
+					$location=$iplocation->getlocation($single->ip);
+					$userip[$single->userid][$single->ip]=iconv('gbk', 'utf-8//IGNORE', $location['country'].$location['area']);
+				}
+			}
+		}
+
+		
+        return $this->view()->assign('users',$users)->assign("regloc",$regloc)->assign("useripcount",$useripcount)->assign("userip",$userip)->display('admin/user/index.tpl');
+    }
+	
 
     public function edit($request, $response, $args){
         $id = $args['id'];
@@ -97,6 +197,7 @@ class UserController extends AdminController
 		$user->node_connector = $request->getParam('node_connector');
         $user->enable = $request->getParam('enable');
         $user->is_admin = $request->getParam('is_admin');
+		$user->node_group = $request->getParam('group');
         $user->ref_by = $request->getParam('ref_by');
 		$user->remark = $request->getParam('remark');
 		$user->class = $request->getParam('class');
@@ -113,7 +214,7 @@ class UserController extends AdminController
     }
 
     public function delete($request, $response, $args){
-        $id = $args['id'];
+        $id = $request->getParam('id');
         $user = User::find($id);
 
 		$email1=$user->email;
@@ -132,21 +233,6 @@ class UserController extends AdminController
         $rs['ret'] = 1;
         $rs['msg'] = "删除成功";
         return $response->getBody()->write(json_encode($rs));
-    }
-
-    public function deleteGet($request, $response, $args){
-        $id = $args['id'];
-        $user = User::find($id);
-
-		$email1=$user->email;
-		Radius::Delete($email1);
-			
-			
-		Da::delete($email1);
-			
-        $user->delete();
-        $newResponse = $response->withStatus(302)->withHeader('Location', '/admin/user');
-        return $newResponse;
     }
 	
 	
