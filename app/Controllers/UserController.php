@@ -92,7 +92,7 @@ class UserController extends BaseController
 				$query->where("node_group","=",$this->user->node_group)
 					->orWhere("node_group","=",0);
 			}
-		)->where("node_class","<=",$this->user->class)->get();
+		)->where("type","1")->where("node_class","<=",$this->user->class)->get();
 		$android_add="";
 		foreach($nodes as $node)
 		{
@@ -155,6 +155,9 @@ class UserController extends BaseController
 	
 	public function code($request, $response, $args)
     {
+		
+
+		
 		$pageNum = 1;
         if (isset($request->getQueryParams()["page"])) {
             $pageNum = $request->getQueryParams()["page"];
@@ -163,6 +166,7 @@ class UserController extends BaseController
 		$codes->setPath('/user/code');
         return $this->view()->assign('codes',$codes)->display('user/code.tpl');
     }
+	
 	
 	public function codepost($request, $response, $args)
     {
@@ -647,7 +651,7 @@ class UserController extends BaseController
 	public function GetPcConf($request, $response, $args){
         
         $newResponse = $response->withHeader('Content-type', ' application/octet-stream')->withHeader('Content-Disposition', ' attachment; filename=gui-config.json');//->getBody()->write($builder->output());
-        $newResponse->getBody()->write(LinkController::GetPcConf(Node::where('sort', 0)->where("id","<>",Config::get('cloudxns_ping_nodeid'))->where("id","<>",Config::get('cloudxns_speed_nodeid'))->where(
+        $newResponse->getBody()->write(LinkController::GetPcConf(Node::where('sort', 0)->where("type","1")->where("id","<>",Config::get('cloudxns_ping_nodeid'))->where("id","<>",Config::get('cloudxns_speed_nodeid'))->where(
 			function ($query) {
 				$query->where("node_group","=",$this->user->node_group)
 					->orWhere("node_group","=",0);
@@ -659,7 +663,7 @@ class UserController extends BaseController
 	public function GetIosConf($request, $response, $args){
         
         $newResponse = $response->withHeader('Content-type', ' application/octet-stream')->withHeader('Content-Disposition', ' attachment; filename=allinone.conf');//->getBody()->write($builder->output());
-        $newResponse->getBody()->write(LinkController::GetIosConf(Node::where('sort', 0)->where("id","<>",Config::get('cloudxns_ping_nodeid'))->where("id","<>",Config::get('cloudxns_speed_nodeid'))->where(
+        $newResponse->getBody()->write(LinkController::GetIosConf(Node::where('sort', 0)->where("type","1")->where("id","<>",Config::get('cloudxns_ping_nodeid'))->where("id","<>",Config::get('cloudxns_speed_nodeid'))->where(
 			function ($query) {
 				$query->where("node_group","=",$this->user->node_group)
 					->orWhere("node_group","=",0);
@@ -784,16 +788,23 @@ class UserController extends BaseController
             return $response->getBody()->write(json_encode($res));
         }
 		
-        $BIP->delete();
+		$BIP = BlockIp::where("ip",$_SERVER["REMOTE_ADDR"])->get();
+		foreach($BIP as $bi)
+		{
+			$bi->delete();
 		
-		$UIP = new UnblockIp();
-		$UIP->userid = $user->id;
-		$UIP->ip = $_SERVER["REMOTE_ADDR"];
-		$UIP->datetime = time();
+			$UIP = new UnblockIp();
+			$UIP->userid = $user->id;
+			$UIP->ip = $_SERVER["REMOTE_ADDR"];
+			$UIP->datetime = time();
+			$UIP->save();
+		}
+		
+        
 
-		$UIP->save();
+		
         $res['ret'] = 1;
-        $res['msg'] = "解封 "+$_SERVER["REMOTE_ADDR"]+" 成功";
+        $res['msg'] = "解封 ".$_SERVER["REMOTE_ADDR"]." 成功";
         return $this->echoJson($response, $res);
     }
 	
@@ -887,6 +898,11 @@ class UserController extends BaseController
 			}
 			else
 			{
+				if($coupon->onetime==1)
+				{
+					$onetime=true;
+				}
+				
 				$credit=$coupon->credit;
 			}
 			
@@ -931,11 +947,12 @@ class UserController extends BaseController
 		}
 		
 		$bought->coupon=$code;
-		if($coupon->onetime==1)
+		
+		
+		if(isset($onetime))
 		{
 			$price=$shop->price;
 		}
-		
 		$bought->price=$price;
 		$bought->save();
 		
@@ -960,12 +977,12 @@ class UserController extends BaseController
 	
 	public function deleteBoughtGet($request, $response, $args){
         $id = $request->getParam('id');
-        $shop = Bought::where("id",$id)->where("userid",$this->user->id)->get;
+        $shop = Bought::where("id",$id)->where("userid",$this->user->id)->first();
 		
 		if($shop==null)
 		{
 			$rs['ret'] = 0;
-            $rs['msg'] = "退订失败";
+            $rs['msg'] = "退订失败，订单不存在。";
             return $response->getBody()->write(json_encode($rs));
 		}
 		
@@ -1311,6 +1328,9 @@ class UserController extends BaseController
     public function handleKill($request, $response, $args)
     {
         $user = Auth::getUser();
+		
+		$email=$user->email;
+		
 		
 		Da::delete($email);
 			
