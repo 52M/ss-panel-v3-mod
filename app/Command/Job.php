@@ -6,7 +6,6 @@ use App\Models\User;
 use App\Models\RadiusBan;
 use App\Models\LoginIp;
 use App\Models\Speedtest;
-use App\Models\Smartline;
 use App\Models\Shop;
 use App\Models\Bought;
 use App\Models\Coupon;
@@ -229,9 +228,9 @@ class Job
 					echo $e->getMessage();
 				}
 				
-				if(file_exists(BASE_PATH."/storage/"+$bought->id+".renew", "w+"))
+				if(file_exists(BASE_PATH."/storage/".$bought->id.".renew", "w+"))
 				{
-					unlink(BASE_PATH."/storage/"+$bought->id+".renew");
+					unlink(BASE_PATH."/storage/".$bought->id.".renew");
 				}
 			}
 			else
@@ -254,7 +253,7 @@ class Job
 					} catch (Exception $e) {
 						echo $e->getMessage();
 					}
-					$myfile = fopen(BASE_PATH."/storage/"+$bought->id+".renew", "w+") or die("Unable to open file!");
+					$myfile = fopen(BASE_PATH."/storage/".$bought->id.".renew", "w+") or die("Unable to open file!");
 					$txt = "1";
 					fwrite($myfile, $txt);
 					fclose($myfile);
@@ -264,447 +263,7 @@ class Job
 		
 		
 		
-		
-		//DNS
-		
-		if(Config::get("cloudxns_apikey")!="")
-		{
-			$api=new Api();
-			$api->setApiKey(Config::get("cloudxns_apikey"));//修改成自己API KEY
-			$api->setSecretKey(Config::get("cloudxns_apisecret"));//修改成自己的SECERET KEY
-			
-			$api->setProtocol(true);
-			
-			$domain_json=json_decode($api->domain->domainList());
-			
-			foreach($domain_json->data as $domain)
-			{
-				if(strpos($domain->domain,Config::get('cloudxns_domain'))!==FALSE)
-				{
-					$domain_id=$domain->id;
-				}
-			}
-			
-			$Users=User::where("enable","=","1")->get();
-			
-			$Class_Array=array();
-			foreach($Users as $User)
-			{
-				$Class_Array[$User->class][$User->node_group]=1;
-			}
-			
-			
-			foreach($Class_Array as $Class => $value)
-			{
-				foreach($Class_Array[$Class] as $Group => $v)
-				{
-					$Telecom_node=0;
-					$Unicom_node=0;
-					$Cmcc_node=0;
-					
-					$Telecom_speed=0;
-					$Unicom_speed=0;
-					$Cmcc_speed=0;
-					
-					$Nodes=Node::where("node_class","<=",$Class)->where(
-						function ($query) {
-							$query->where("node_group","=",$Group)
-								->orWhere("node_group","=",0);
-						}
-					)->where("type","1")->get();
-					foreach($Nodes as $Node)
-					{
-						if($node->node_bandwidth_limit==0||$node->node_bandwidth<$node->node_bandwidth_limit)
-						{
-							$Speed=Speedtest::where("nodeid","=",$Node->id)->where("datetime",">",time()-Config::get('Speedtest_duration')*3600)->orderBy("datetime","desc")->take(1)->first();
-							if($Speed!=null)
-							{
-								$SpeedArray=explode(" ",$Speed->telecomeupload);
-								if($SpeedArray[0]!="null")
-								{
-									if($SpeedArray[0]>$Telecom_speed)
-									{
-										$Telecom_speed=$SpeedArray[0];
-										$Telecom_node=$Node->id;
-										
-									}
-								}
-								
-								$SpeedArray=explode(" ",$Speed->unicomupload);
-								if($SpeedArray[0]!="null")
-								{
-									if($SpeedArray[0]>$Unicom_speed)
-									{
-										$Unicom_speed=$SpeedArray[0];
-										$Unicom_node=$Node->id;
-									}
-								}
-								
-								$SpeedArray=explode(" ",$Speed->cmccupload);
-								if($SpeedArray[0]!="null")
-								{
-									if($SpeedArray[0]>$Cmcc_speed)
-									{
-										$Cmcc_speed=$SpeedArray[0];
-										$Cmcc_node=$Node->id;
-									}
-								}
-							}
-						}
-					}
-					
-					
-					$smt=Smartline::where('node_class',$Class)->where("node_group","=",$Group)->where("type",0)->first();
-					
-					if($smt==null)
-					{
-						$prefix=Tools::genRandomChar(8);
-					}
-					else
-					{
-						$prefix=$smt->domain_prefix;
-					}
-					
-					$Telecom_node=Node::where("id",$Telecom_node)->first();
-					if(Tools::is_ip($Telecom_node->server))
-					{
-						if($smt==null)
-						{
-							$result=json_decode($api->record->recordAdd($domain_id, $prefix.'.'.Config::get('cloudxns_prefix'), $Telecom_node->server, 'A', 55, 60, 1),TRUE);
-							$t_id=$result['record_id'][0];
-						}
-						else
-						{
-							if($smt->t_id!=$Telecom_node->id)
-							{
-								$api->record->recordUpdate($domain_id, $prefix.'.'.Config::get('cloudxns_prefix'), $Telecom_node->server, 'A', 55, 60, 1,'',$smt->t_id);
-							}
-						}
-					}
-					else
-					{
-						if($smt==null)
-						{
-							$result=json_decode($api->record->recordAdd($domain_id, $prefix.'.'.Config::get('cloudxns_prefix'), $Telecom_node->server, 'CNAME', 55, 60, 1),TRUE);
-							$t_id=$result['record_id'][0];
-						}
-						else
-						{
-							if($smt->t_id!=$Telecom_node->id)
-							{
-								$api->record->recordUpdate($domain_id, $prefix.'.'.Config::get('cloudxns_prefix'), $Telecom_node->server, 'CNAME', 55, 60, 1,'',$smt->t_id);
-							}
-						}
-					}
-					
-					
-					
-					$Unicom_node=Node::where("id",$Unicom_node)->first();
-					if(Tools::is_ip($Unicom_node->server))
-					{
-						if($smt==null)
-						{
-							$result=json_decode($api->record->recordAdd($domain_id, $prefix.'.'.Config::get('cloudxns_prefix'), $Unicom_node->server, 'A', 55, 60, 3),TRUE);
-							
-							$u_id=$result['record_id'][0];
-						}
-						else
-						{
-							if($smt->u_node!=$Unicom_node->id)
-							{
-								$api->record->recordUpdate($domain_id, $prefix.'.'.Config::get('cloudxns_prefix'), $Unicom_node->server, 'A', 55, 60, 3,'',$smt->u_id);
-							}
-						}
-					}
-					else
-					{
-						if($smt==null)
-						{
-							$result=json_decode($api->record->recordAdd($domain_id, $prefix.'.'.Config::get('cloudxns_prefix'), $Unicom_node->server, 'CNAME', 55, 60, 3),TRUE);
-							$u_id=$result['record_id'][0];
-						}
-						else
-						{
-							if($smt->u_node!=$Unicom_node->id)
-							{
-								$api->record->recordUpdate($domain_id, $prefix.'.'.Config::get('cloudxns_prefix'), $Unicom_node->server, 'CNAME', 55, 60, 3,'',$smt->u_id);
-							}
-						}
-					}
-					
-					$Cmcc_node=Node::where("id",$Cmcc_node)->first();
-					if(Tools::is_ip($Cmcc_node->server))
-					{
-						if($smt==null)
-						{
-							$result=json_decode($api->record->recordAdd($domain_id, $prefix.'.'.Config::get('cloudxns_prefix'), $Cmcc_node->server, 'A', 55, 60, 144),TRUE);
-							$c_id=$result['record_id'][0];
-						}
-						else
-						{
-							if($smt->c_node!=$Cmcc_node->id)
-							{
-								$api->record->recordUpdate($domain_id, $prefix.'.'.Config::get('cloudxns_prefix'), $Cmcc_node->server, 'A', 55, 60, 144,'',$smt->c_id);
-							}
-						}
-					}
-					else
-					{
-						if($smt==null)
-						{
-							$result=json_decode($api->record->recordAdd($domain_id, $prefix.'.'.Config::get('cloudxns_prefix'), $Cmcc_node->server, 'CNAME', 55, 60, 144),TRUE);
-							$c_id=$result['record_id'][0];
-						}
-						else
-						{
-							if($smt->c_node!=$Cmcc_node->id)
-							{
-								$api->record->recordUpdate($domain_id, $prefix.'.'.Config::get('cloudxns_prefix'), $Cmcc_node->server, 'CNAME', 55, 60, 144,'',$smt->c_id);
-							}
-						}
-					}
-					
-					
-					if($smt==null)
-					{
-						
-						$smt=new Smartline();
-						$smt->node_class=$Class;
-						$smt->node_group=$Group;
-						$smt->domain_prefix=$prefix;
-						$smt->type=0;
-						$smt->t_id=$t_id;
-						$smt->u_id=$u_id;
-						$smt->c_id=$c_id;
-						$smt->t_node=$Telecom_node->id;
-						$smt->u_node=$Unicom_node->id;
-						$smt->c_node=$Cmcc_node->id;
-						$smt->save();
-					}
-					else
-					{
-						
-						$prefix=$smt->domain_prefix;
-						$smt->t_node=$Telecom_node->id;
-						$smt->u_node=$Unicom_node->id;
-						$smt->c_node=$Cmcc_node->id;
-						$smt->save();
-					}
-					
-				
-				
-				}
-			}
-			
-			
-			
-			foreach($Class_Array as $Class => $Value)
-			{
-				foreach($Class_Array[$Class] as $Group => $v)
-				{
-					$Telecom_node=0;
-					$Unicom_node=0;
-					$Cmcc_node=0;
-					
-					$Telecom_ping=0;
-					$Unicom_ping=0;
-					$Cmcc_ping=0;
-					
-					$Nodes=Node::where("node_class","<=",$Class)->where(
-						function ($query) {
-							$query->where("node_group","=",$Group)
-								->orWhere("node_group","=",0);
-						}
-					)->where("type","1")->get();
-					foreach($Nodes as $Node)
-					{
-						if($node->node_bandwidth_limit==0||$node->node_bandwidth<$node->node_bandwidth_limit)
-						{
-							$Speed=Speedtest::where("nodeid","=",$Node->id)->where("datetime",">",time()-Config::get('Speedtest_duration')*3600)->orderBy("datetime","desc")->take(1)->first();
-							if($Speed!=null)
-							{
-								$SpeedArray=explode(" ",$Speed->telecomping);
-								if($SpeedArray[0]!="null")
-								{
-									if($SpeedArray[0]<$Telecom_ping||$Telecom_ping==0)
-									{
-										$Telecom_ping=$SpeedArray[0];
-										$Telecom_node=$Node->id;
-									}
-								}
-								
-								$SpeedArray=explode(" ",$Speed->unicomping);
-								if($SpeedArray[0]!="null")
-								{
-									if($SpeedArray[0]<$Unicom_ping||$Unicom_ping==0)
-									{
-										$Unicom_ping=$SpeedArray[0];
-										$Unicom_node=$Node->id;
-									}
-								}
-								
-								$SpeedArray=explode(" ",$Speed->cmccping);
-								if($SpeedArray[0]!="null")
-								{
-									if($SpeedArray[0]<$Cmcc_ping||$Cmcc_ping==0)
-									{
-										$Cmcc_ping=$SpeedArray[0];
-										$Cmcc_node=$Node->id;
-									}
-								}
-							}
-						}
-					}
-					
-					$smt=Smartline::where('node_class',$Class)->where("node_group","=",$Group)->where("type",1)->first();
-					if($smt==null)
-					{
-						$prefix=Tools::genRandomChar(8);
-					}
-					else
-					{
-						$prefix=$smt->domain_prefix;
-					}
-					
-					
-					
-					$Telecom_node=Node::where("id",$Telecom_node)->first();
-					if(Tools::is_ip($Telecom_node->server))
-					{
-						if($smt==null)
-						{
-							$result=json_decode($api->record->recordAdd($domain_id, $prefix.'.'.Config::get('cloudxns_prefix'), $Telecom_node->server, 'A', 55, 60, 1),TRUE);
-							
-							$t_id=$result['record_id'][0];
-						}
-						else
-						{
-							if($smt->t_id!=$Telecom_node->id)
-							{
-								$api->record->recordUpdate($domain_id, $prefix.'.'.Config::get('cloudxns_prefix'), $Telecom_node->server, 'A', 55, 60, 1,'',$smt->t_id);
-							}
-						}
-					}
-					else
-					{
-						if($smt==null)
-						{
-							$result=json_decode($api->record->recordAdd($domain_id, $prefix.'.'.Config::get('cloudxns_prefix'), $Telecom_node->server, 'CNAME', 55, 60, 1),TRUE);
-							$t_id=$result['record_id'][0];
-						}
-						else
-						{
-							if($smt->t_id!=$Telecom_node->id)
-							{
-								$api->record->recordUpdate($domain_id, $prefix.'.'.Config::get('cloudxns_prefix'), $Telecom_node->server, 'CNAME', 55, 60, 1,'',$smt->t_id);
-							}
-						}
-					}
-					
-					
-					
-					$Unicom_node=Node::where("id",$Unicom_node)->first();
-					if(Tools::is_ip($Unicom_node->server))
-					{
-						if($smt==null)
-						{
-							$result=json_decode($api->record->recordAdd($domain_id, $prefix.'.'.Config::get('cloudxns_prefix'), $Unicom_node->server, 'A', 55, 60, 3),TRUE);
-							$u_id=$result['record_id'][0];
-						}
-						else
-						{
-							if($smt->u_node!=$Unicom_node->id)
-							{
-								$api->record->recordUpdate($domain_id, $prefix.'.'.Config::get('cloudxns_prefix'), $Unicom_node->server, 'A', 55, 60, 3,'',$smt->u_id);
-							}
-						}
-					}
-					else
-					{
-						if($smt==null)
-						{
-							$result=json_decode($api->record->recordAdd($domain_id, $prefix.'.'.Config::get('cloudxns_prefix'), $Unicom_node->server, 'CNAME', 55, 60, 3),TRUE);
-							$u_id=$result['record_id'][0];
-						}
-						else
-						{
-							if($smt->u_node!=$Unicom_node->id)
-							{
-								$api->record->recordUpdate($domain_id, $prefix.'.'.Config::get('cloudxns_prefix'), $Unicom_node->server, 'CNAME', 55, 60, 3,'',$smt->u_id);
-							}
-						}
-					}
-					
-					$Cmcc_node=Node::where("id",$Cmcc_node)->first();
-					if(Tools::is_ip($Cmcc_node->server))
-					{
-						if($smt==null)
-						{
-							$result=json_decode($api->record->recordAdd($domain_id, $prefix.'.'.Config::get('cloudxns_prefix'), $Cmcc_node->server, 'A', 55, 60, 144),TRUE);
-							$c_id=$result['record_id'][0];
-						}
-						else
-						{
-							if($smt->c_node!=$Cmcc_node->id)
-							{
-								$api->record->recordUpdate($domain_id, $prefix.'.'.Config::get('cloudxns_prefix'), $Cmcc_node->server, 'A', 55, 60, 144,'',$smt->c_id);
-							}
-						}
-					}
-					else
-					{
-						if($smt==null)
-						{
-							$result=json_decode($api->record->recordAdd($domain_id, $prefix.'.'.Config::get('cloudxns_prefix'), $Cmcc_node->server, 'CNAME', 55, 60, 144),TRUE);
-							$c_id=$result['record_id'][0];
-						}
-						else
-						{
-							if($smt->c_node!=$Cmcc_node->id)
-							{
-								$api->record->recordUpdate($domain_id, $prefix.'.'.Config::get('cloudxns_prefix'), $Cmcc_node->server, 'CNAME', 55, 60, 144,'',$smt->c_id);
-							}
-						}
-					}
-					
-					
-					if($smt==null)
-					{
-						$smt=new Smartline();
-						$smt->node_class=$Class;
-						$smt->node_group=$Group;
-						$smt->domain_prefix=$prefix;
-						$smt->type=1;
-						$smt->t_id=$t_id;
-						$smt->u_id=$u_id;
-						$smt->c_id=$c_id;
-						$smt->t_node=$Telecom_node->id;
-						$smt->u_node=$Unicom_node->id;
-						$smt->c_node=$Cmcc_node->id;
-						$smt->save();
-					}
-					else
-					{
-						$prefix=$smt->domain_prefix;
-						$smt->t_node=$Telecom_node->id;
-						$smt->u_node=$Unicom_node->id;
-						$smt->c_node=$Cmcc_node->id;
-						$smt->save();
-					}
-				
-				}
-			}
-			
-			$ping=Node::where("id",Config::get('cloudxns_ping_nodeid'))->first();
-			$ping->node_heartbeat=time();
-			$ping->save();
-			
-			$speed=Node::where("id",Config::get('cloudxns_speed_nodeid'))->first();
-			$speed->node_heartbeat=time();
-			$speed->save();
-			
-		}
-		
+
 		$adminUser = User::where("is_admin","=","1")->get();
 		
 		$newmd5 = md5(file_get_contents("https://github.com/glzjin/ss-panel-v3-mod/raw/master/bootstrap.php"));
@@ -753,7 +312,7 @@ class Job
 			$nodes = Node::all();
 			
 			foreach($nodes as $node){
-				if(time()-$node->node_heartbeat>300&&time()-$node->node_heartbeat<360&&$node->node_heartbeat!=0&&($node->sort==0||$node->sort==7||$node->sort==8))
+				if(time()-$node->node_heartbeat>300&&time()-$node->node_heartbeat<=360&&$node->node_heartbeat!=0&&($node->sort==0||$node->sort==7||$node->sort==8))
 				{
 					foreach($adminUser as $user)
 					{
@@ -770,10 +329,52 @@ class Job
 							echo $e->getMessage();
 						}
 						
+						if(Config::get('enable_cloudxns')=='true')
+						{
+							$api=new Api();
+							$api->setApiKey(Config::get("cloudxns_apikey"));//修改成自己API KEY
+							$api->setSecretKey(Config::get("cloudxns_apisecret"));//修改成自己的SECERET KEY
+							
+							$api->setProtocol(true);
+							
+							$domain_json=json_decode($api->domain->domainList());
+							
+							foreach($domain_json->data as $domain)
+							{
+								if(strpos($domain->domain,Config::get('cloudxns_domain'))!==FALSE)
+								{
+									$domain_id=$domain->id;
+								}
+							}
+							
+							$record_json=json_decode($api->record->recordList($domain_id, 0, 0, 2000));
+							
+							foreach($record_json->data as $record)
+							{
+								if(($record->host.".".Config::get('cloudxns_domain'))==$node->server)
+								{
+									$record_id=$record->record_id;
+									
+									$Temp_node=Node::where('node_class','<=',$node->node_class)->where(
+										function ($query) {
+											$query->where("node_group","=",$node->node_group)
+												->orWhere("node_group","=",0);
+										}
+									)->whereRaw('UNIX_TIMESTAMP()-`node_heartbeat`<300')->first();
+									
+									if($Temp_node!=null)
+									{								
+										$api->record->recordUpdate($domain_id, $record->host, $Temp_node->server, 'CNAME', 55, 60, 1, '', $record_id);
+									}
+								}
+							}
+							
+						}
+						
 						
 					}
 					
-					$myfile = fopen(BASE_PATH."/storage/"+$node->id+".offline", "w+") or die("Unable to open file!");
+					$myfile = fopen(BASE_PATH."/storage/".$node->id.".offline", "w+") or die("Unable to open file!");
 					$txt = "1";
 					fwrite($myfile, $txt);
 					fclose($myfile);
@@ -782,7 +383,7 @@ class Job
 			
 			
 			foreach($nodes as $node){
-				if(time()-$node->node_heartbeat<60&&file_exists(BASE_PATH."/storage/"+$node->id+".offline")&&$node->node_heartbeat!=0&&($node->sort==0||$node->sort==7||$node->sort==8))
+				if(time()-$node->node_heartbeat<60&&file_exists(BASE_PATH."/storage/".$node->id.".offline")&&$node->node_heartbeat!=0&&($node->sort==0||$node->sort==7||$node->sort==8))
 				{
 					foreach($adminUser as $user)
 					{
@@ -800,9 +401,41 @@ class Job
 						}
 						
 						
+						if(Config::get('enable_cloudxns')=='true')
+						{
+							$api=new Api();
+							$api->setApiKey(Config::get("cloudxns_apikey"));//修改成自己API KEY
+							$api->setSecretKey(Config::get("cloudxns_apisecret"));//修改成自己的SECERET KEY
+							
+							$api->setProtocol(true);
+							
+							$domain_json=json_decode($api->domain->domainList());
+							
+							foreach($domain_json->data as $domain)
+							{
+								if(strpos($domain->domain,Config::get('cloudxns_domain'))!==FALSE)
+								{
+									$domain_id=$domain->id;
+								}
+							}
+							
+							$record_json=json_decode($api->record->recordList($domain_id, 0, 0, 2000));
+							
+							foreach($record_json->data as $record)
+							{
+								if(($record->host.".".Config::get('cloudxns_domain'))==$node->server)
+								{
+									$record_id=$record->record_id;
+									
+									$api->record->recordUpdate($domain_id, $record->host, $node->node_ip, 'A', 55, 600, 1, '', $record_id);
+								}
+							}
+							
+						}
+						
 					}
 					
-					unlink(BASE_PATH."/storage/"+$node->id+".offline");
+					unlink(BASE_PATH."/storage/".$node->id.".offline");
 				}
 			}
 		}

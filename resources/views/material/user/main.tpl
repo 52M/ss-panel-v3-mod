@@ -187,6 +187,9 @@
 		}
 				
 	</style>
+	
+	
+	
 </head>
 <body class="page-orange">
 	<header class="header header-orange header-transparent header-waterfall ui-header">
@@ -265,7 +268,7 @@
 						</a>
 					</li>
 					
-					{if $config["wecenter_url"]!=""}
+					{if $enable_wecenter=='true'}
 					<li>
 						<a href="{$config["wecenter_url"]}" target="_blank">
 							<i class="icon icon-lg">help</i>&nbsp;问答
