@@ -624,9 +624,7 @@ CREATE TABLE IF NOT EXISTS `ss_node` (
 
 INSERT INTO `ss_node` (`id`, `name`, `type`, `server`, `method`, `info`, `status`, `sort`, `custom_method`, `traffic_rate`, `node_class`, `node_speedlimit`, `node_connector`, `node_bandwidth`, `node_bandwidth_limit`, `bandwidthlimit_resetday`, `node_heartbeat`, `node_ip`) VALUES
 (NULL, '统一验证登陆', 0, 'zhaojin97.cn', 'radius', '统一登陆验证', '可用', 999, 0, 1, 0, 0, 0, 0, 0, 0, 0, ''),
-(NULL, 'VPN 统一流量结算', 0, 'zhaojin97.cn', 'radius', 'VPN 统一流量结算', '可用', 999, 0, 1, 0, 0, 0, 0, 0, 0, 0, NULL),
-(NULL, '智能线路（速度） - Shadowsocks', 1, 'smart.zhaoj.in', 'aes-256-cfb', '智能线路，注重速度。', '可用', 0, 1, 1, 0, 0, 0, 0, 0, 0, 1461851943, NULL),
-(NULL, '智能线路（延时） - Shadowsocks', 1, 'smart.zhaoj.in', 'aes-256-cfb', '智能线路，降低延时。', '可用', 0, 1, 1, 0, 0, 0, 0, 0, 0, 1461851943, NULL);
+(NULL, 'VPN 统一流量结算', 0, 'zhaojin97.cn', 'radius', 'VPN 统一流量结算', '可用', 999, 0, 1, 0, 0, 0, 0, 0, 0, 0, NULL);
 
 
 ALTER TABLE `user` ADD `node_group` INT NOT NULL DEFAULT '0' AFTER `remark`;
@@ -667,3 +665,12 @@ CREATE TABLE `auto` ( `id` BIGINT NOT NULL AUTO_INCREMENT , `type` INT NOT NULL 
 
 
 ALTER TABLE `auto` ADD `sign` LONGTEXT NOT NULL AFTER `value`;ALTER TABLE `user` ADD `relay_enable` INT NOT NULL DEFAULT '0' AFTER `auto_reset_bandwidth`, ADD `relay_info` LONGTEXT NULL AFTER `relay_enable`;
+ALTER TABLE `ss_node` ADD `custom_rss` INT NOT NULL DEFAULT '0' AFTER `node_group`;
+
+ALTER TABLE `user` ADD `protocol` VARCHAR(128) NOT NULL DEFAULT 'origin' AFTER `relay_info`, ADD `protocol_param` VARCHAR(128) NULL DEFAULT NULL AFTER `protocol`, ADD `obfs` VARCHAR(128) NOT NULL DEFAULT 'plain' AFTER `protocol_param`, ADD `obfs_param` VARCHAR(128) NULL DEFAULT NULL AFTER `obfs`;
+
+
+
+ALTER TABLE `user` ADD `forbidden_ip` LONGTEXT NULL DEFAULT '' AFTER `obfs_param`, ADD `forbidden_port` LONGTEXT NULL DEFAULT '' AFTER `forbidden_ip`, ADD `disconnect_ip` LONGTEXT NULL DEFAULT '' AFTER `forbidden_port`;
+
+CREATE TABLE `disconnect_ip` ( `id` BIGINT NOT NULL AUTO_INCREMENT , `userid` BIGINT NOT NULL , `ip` TEXT NOT NULL , `datetime` BIGINT NOT NULL , PRIMARY KEY (`id`)) ENGINE = InnoDB;

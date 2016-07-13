@@ -49,6 +49,16 @@
 										</div>
 									</div>
 									
+									{if $config['enable_rss']=='true'}
+									<div class="form-group form-group-label">
+										<div class="checkbox switch">
+											<label for="custom_rss">
+												<input  class="access-hide" id="custom_rss" type="checkbox" name="custom_rss"><span class="switch-toggle"></span>自定义协议&混淆
+											</label>
+										</div>
+									</div>
+									{/if}
+									
 									
 								</div>
 							</div>
@@ -83,7 +93,7 @@
 													<option value="5">Anyconnect</option>
 													<option value="6">APN</option>
 													<option value="7">PAC PLUS(Socks 代理生成 PAC文件)</option>
-													<option value="7">PAC PLUS PLUS(HTTPS 代理生成 PAC文件)</option>
+													<option value="8">PAC PLUS PLUS(HTTPS 代理生成 PAC文件)</option>
 												</select>
 											</div>
 									</div>
@@ -202,6 +212,17 @@
 			{
 				var type=0;
 			}
+			{/literal}
+			{if $config['enable_rss']=='true'}
+			if(document.getElementById('custom_rss').checked)
+			{
+				var custom_rss=1;
+			}
+			else
+			{
+				var custom_rss=0;
+			}
+			{/if}
 			
 			
             $.ajax({
@@ -222,7 +243,10 @@
                     sort: $("#sort").val(),
 					class: $("#class").val(),
 					node_bandwidth_limit: $("#node_bandwidth_limit").val(),
-					bandwidthlimit_resetday: $("#bandwidthlimit_resetday").val()
+					bandwidthlimit_resetday: $("#bandwidthlimit_resetday").val(){if $config['enable_rss']=='true'},
+					custom_rss: custom_rss{else},
+					custom_rss: 0
+					{/if}
                 },
                 success: function (data) {
                     if (data.ret) {
@@ -243,5 +267,5 @@
 	});
 
 </script>
-{/literal}
+
 
