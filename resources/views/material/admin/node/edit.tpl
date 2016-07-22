@@ -106,7 +106,7 @@
 									</div>
 									
 									<div class="form-group form-group-label">
-										<label class="floating-label" for="class">节点类别（不分类请填0，分类为数字）</label>
+										<label class="floating-label" for="class">节点等级（不分级请填0，分级为数字）</label>
 										<input class="form-control" id="class" name="class" type="text" value="{$node->node_class}">
 									</div>
 									
@@ -253,8 +253,10 @@
                 success: function (data) {
                     if (data.ret) {
                         $("#result").modal();
-                        $("#msg").html(data.msg+"  五秒后跳转。");
-                        window.setTimeout("location.href=top.document.referrer", 5000);
+                        $("#msg").html(data.msg);
+						{/literal}
+                        window.setTimeout("location.href=top.document.referrer", {$config['jump_delay']});
+						{literal}
                     } else {
                         $("#result").modal();
                         $("#msg").html(data.msg);

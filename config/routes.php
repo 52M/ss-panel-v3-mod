@@ -104,7 +104,6 @@ $app->group('/user', function () {
     $this->post('/password', 'App\Controllers\UserController:updatePassword');
 	$this->post('/wechat', 'App\Controllers\UserController:updateWechat');
 	$this->post('/rss', 'App\Controllers\UserController:updateRss');
-	$this->post('/relay', 'App\Controllers\UserController:updateRelay');
 	$this->post('/theme', 'App\Controllers\UserController:updateTheme');
 	$this->post('/mail', 'App\Controllers\UserController:updateMail');
     $this->post('/sspwd', 'App\Controllers\UserController:updateSsPwd');
@@ -136,6 +135,7 @@ $app->group('/auth', function () {
     $this->post('/login', 'App\Controllers\AuthController:loginHandle');
     $this->get('/register', 'App\Controllers\AuthController:register');
     $this->post('/register', 'App\Controllers\AuthController:registerHandle');
+    $this->post('/send', 'App\Controllers\AuthController:sendVerify');
     $this->get('/logout', 'App\Controllers\AuthController:logout');
 })->add(new Guest());
 

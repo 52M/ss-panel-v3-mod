@@ -38,6 +38,45 @@ class Job
 		}
 	}
 	
+	public static function backup()
+	{
+		mkdir('/tmp/ssmodbackup/');
+		
+		system('mysqldump --user='.Config::get('db_username').' --password='.Config::get('db_password').' --host='.Config::get('db_host').' '.Config::get('db_database').' announcement auto blockip bought code coupon disconnect_ip link login_ip payback radius_ban shop speedtest ss_invite_code ss_node ss_password_reset ticket unblockip user user_token> /tmp/ssmodbackup/mod.sql',$ret);
+		
+		
+		system('mysqldump --opt --user='.Config::get('db_username').' --password='.Config::get('db_password').' --host='.Config::get('db_host').' -d '.Config::get('db_database').' alive_ip ss_node_info ss_node_online_log user_traffic_log >> /tmp/ssmodbackup/mod.sql',$ret);
+		
+		if(Config::get('enable_radius')=='true')
+		{
+			system('mysqldump --user='.Config::get('radius_db_user').' --password='.Config::get('radius_db_password').' --host='.Config::get('radius_db_host').' '.Config::get('radius_db_database').'> /tmp/ssmodbackup/radius.sql',$ret);
+		}
+		
+		if(Config::get('enable_wecenter')=='true')
+		{
+			system('mysqldump --user='.Config::get('wecenter_db_user').' --password='.Config::get('wecenter_db_password').' --host='.Config::get('wecenter_db_host').' '.Config::get('wecenter_db_database').'> /tmp/ssmodbackup/wecenter.sql',$ret);
+		}
+	
+		system("cp ".Config::get('auto_backup_webroot')."/config/.config.php /tmp/ssmodbackup/",$ret);
+		system("zip -r /tmp/ssmodbackup.zip /tmp/ssmodbackup/* -P ".Config::get('auto_backup_passwd'),$ret);
+		
+		$subject = Config::get('appName')."-备份成功";
+		$to = Config::get('auto_backup_email');
+		$text = "您好，系统已经为您自动备份，请查看附件，用您设定的密码解压。" ;
+		try {
+			Mail::send($to, $subject, 'news/backup.tpl', [
+				"text" => $text
+			], ["/tmp/ssmodbackup.zip"
+			]);
+		} catch (Exception $e) {
+			echo $e->getMessage();
+		}
+		
+		system("rm -rf /tmp/ssmodbackup",$ret);
+		system("rm /tmp/ssmodbackup.zip",$ret);
+		
+	}
+	
 	public static function SyncDuoshuo()
     {
 		$users = User::all();
@@ -78,6 +117,9 @@ class Job
 	
 	public static function DailyJob()
     {
+		
+		
+		
 		$nodes = Node::all();
         foreach($nodes as $node){
 			if($node->sort==0)
@@ -182,7 +224,10 @@ class Job
 			}
 		}
 		
-		
+		if(Config::get('enable_auto_backup') == 'true')
+		{
+			Job::backup();
+		}
 		
 		
 		
@@ -194,7 +239,7 @@ class Job
 		$users = User::where('node_connector','>',0)->get();
 		foreach($users as $user)
 		{
-			$alive_ips = Ip::where("datetime",">=",time()-90)->where('userid', '=',$user->id)->get();
+			$alive_ips = Ip::where("datetime",">=",time()-60)->where('userid', '=',$user->id)->get();
 			$ip_count = 0;
 			$ips = array();
 			foreach($alive_ips as $alive_ip)
@@ -206,20 +251,26 @@ class Job
 					if($user->node_connector < $ip_count)
 					{
 						//暂时封禁
-						$disconnect = new Disconnect();
-						$disconnect->userid = $user->id;
-						$disconnect->ip = $alive_ip->ip;
-						$disconnect->datetime = time();
+						$isDisconnect = Disconnect::where('id','=',$alive_ip->ip)->where('userid','=',$user->id)->first();
 						
-						if($user->disconnect_ip == NULL||$user->disconnect_ip == "")
+						if($isDisconnect == null)
 						{
-							$user->disconnect_ip = $alive_ip->ip;
+							$disconnect = new Disconnect();
+							$disconnect->userid = $user->id;
+							$disconnect->ip = $alive_ip->ip;
+							$disconnect->datetime = time();
+							$disconnect->save();
+							
+							if($user->disconnect_ip == NULL||$user->disconnect_ip == "")
+							{
+								$user->disconnect_ip = $alive_ip->ip;
+							}
+							else
+							{
+								$user->disconnect_ip .= ",".$alive_ip->ip;
+							}
+							$user->save();
 						}
-						else
-						{
-							$user->disconnect_ip = ",".$alive_ip->ip;
-						}
-						$user->save();
 					}
 				}
 			}
@@ -251,6 +302,8 @@ class Job
 				}
 			}
 			
+			$user->save();
+			
 			$disconnected->delete();
 		}
 		
@@ -260,10 +313,21 @@ class Job
 		{
 			$user=User::where("id",$bought->userid)->first();
 			
+			if($user == NULL)
+			{
+				$bought->delete();
+				continue;
+			}
+			
 			if($user->money>=$bought->price)
 			{
-				$shop=Shop::where("id",$bought->shopid);
+				$shop=Shop::where("id",$bought->shopid)->first();
 				
+				if($shop == NULL)
+				{
+					$bought->delete();
+					continue;
+				}
 				
 				if($shop->auto_reset_bandwidth==1)
 				{
@@ -293,20 +357,15 @@ class Job
 					echo $e->getMessage();
 				}
 				
-				if(file_exists(BASE_PATH."/storage/".$bought->id.".renew", "w+"))
+				if(file_exists(BASE_PATH."/storage/".$bought->id.".renew"))
 				{
 					unlink(BASE_PATH."/storage/".$bought->id.".renew");
 				}
 			}
 			else
 			{
-				if(!file_exists(BASE_PATH."/storage/"+$bought->id+".renew", "w+"))
+				if(!file_exists(BASE_PATH."/storage/".$bought->id.".renew"))
 				{
-					if($shop->auto_reset_bandwidth==1)
-					{
-						$user->transfer_enable=$shop->bandwidth()*1024*1024*1024;
-					}
-				
 					$subject = Config::get('appName')."-续费失败";
 					$to = $user->email;
 					$text = "您好，系统为您自动续费商品名：".$shop->name.",金额:".$bought->price." 元 时，发现您余额不足，请及时充值，当您充值之后，稍等一会系统就会自动扣费为您续费了。" ;
@@ -425,7 +484,7 @@ class Job
 									$record_id=$record->record_id;
 									
 									$Temp_node=Node::where('node_class','<=',$node->node_class)->where(
-										function ($query) {
+										function ($query) use ($node) {
 											$query->where("node_group","=",$node->node_group)
 												->orWhere("node_group","=",0);
 										}
@@ -584,6 +643,13 @@ class Job
 		$rbusers = RadiusBan::all();
 		foreach($rbusers as $sinuser){
 			$user=User::find($sinuser->userid);
+			
+			if($user == NULL)
+			{
+				$sinuser->delete();
+				continue;
+			}
+			
 			if($user->enable==1&&(strtotime($user->expire_in)>time()||strtotime($user->expire_in)<644447105)&&$user->transfer_enable>$user->u+$user->d)
 			{
 				$sinuser->delete();

@@ -147,7 +147,7 @@ class UserController extends BaseController
     {
 		require_once(BASE_PATH.'/vendor/paymentwall/paymentwall-php/lib/paymentwall.php');
 		
-		if(Config::get('pmw_publickey')!="")
+		if(Config::get('enable_paymentwall') == 'true')
 		{
 			\Paymentwall_Config::getInstance()->set(array(
 				'api_type' => \Paymentwall_Config::API_VC,
@@ -202,8 +202,8 @@ class UserController extends BaseController
 	public function code_check($request, $response, $args)
     {
 		$time = $request->getQueryParams()["time"];
-		$codes = Code::where('userid','=',$this->user->id)->where('usedatetime','>',date('Y-m-d H:i:s',$time))->count();
-		if($codes!=0)
+		$codes = Code::where('userid','=',$this->user->id)->where('usedatetime','>',date('Y-m-d H:i:s',$time))->first();
+		if($codes!=null && strpos($codes->code,"Payment Wall 充值") !== FALSE)
 		{
 			$res['ret'] = 1;
             return $response->getBody()->write(json_encode($res));
@@ -418,7 +418,12 @@ class UserController extends BaseController
 					$node_prefix[$temp[0]]=array();
 					$node_order[$temp[0]]=$a;
 					$node_alive[$temp[0]]=0;
-					$node_method[$temp[0]]=$temp[1];
+					
+					if(isset($temp[1]))
+					{
+						$node_method[$temp[0]]=$temp[1];
+					}
+					
 					$a++;
 				}
 
@@ -520,14 +525,18 @@ class UserController extends BaseController
 						
 						$ssurl = str_replace("_compatible","",$user->obfs).":".str_replace("_compatible","",$user->protocol).":".$ary['method'] . ":" . $ary['password'] . "@" . $ary['server'] . ":" . $ary['server_port']."/".base64_encode($user->obfs_param);
 						$ssqr_s = "ss://" . base64_encode($ssurl);
+						$ssurl = $ary['server']. ":" . $ary['server_port'].":".str_replace("_compatible","",$user->protocol).":".$ary['method'].":".str_replace("_compatible","",$user->obfs).":".base64_encode($ary['password'])."/?obfsparam=".base64_encode($user->obfs_param)."&remarks=".base64_encode($node->name);
+						$ssqr_s_new = "ssr://" . base64_encode($ssurl);
 						$ssurl = $ary['method'] . ":" . $ary['password'] . "@" . $ary['server'] . ":" . $ary['server_port'];
 						$ssqr = "ss://" . base64_encode($ssurl);
+						
 					}
 					else
 					{
 						$ssurl = $ary['method'] . ":" . $ary['password'] . "@" . $ary['server'] . ":" . $ary['server_port'];
 						$ssqr = "ss://" . base64_encode($ssurl);
 						$ssqr_s = "ss://" . base64_encode($ssurl);
+						$ssqr_s_new = "ss://" . base64_encode($ssurl);
 					}
 					
 					$token_1 = LinkController::GenerateSurgeCode($ary['server'],$ary['server_port'],$this->user->id,0,$ary['method']);
@@ -537,7 +546,7 @@ class UserController extends BaseController
 					$surge_proxy = "#!PROXY-OVERRIDE:ProxyBase.conf\n";
 					$surge_proxy .= "[Proxy]\n";
 					$surge_proxy .= "Proxy = custom," . $ary['server'] . "," . $ary['server_port'] . "," . $ary['method'] . "," . $ary['password'] . "," . Config::get('baseUrl') . "/downloads/SSEncrypt.module";
-					return $this->view()->assign('ary', $ary)->assign('node',$node)->assign('user',$this->user)->assign('json', $json)->assign('link1',Config::get('baseUrl')."/link/".$token_1)->assign('link2',Config::get('baseUrl')."/link/".$token_2)->assign('json_show', $json_show)->assign('ssqr', $ssqr)->assign('ssqr_s', $ssqr_s)->assign('surge_base', $surge_base)->assign('surge_proxy', $surge_proxy)->assign('info_server', $ary['server'])->assign('info_port', $this->user->port)->assign('info_method', $ary['method'])->assign('info_pass', $this->user->passwd)->display('user/nodeinfo.tpl');
+					return $this->view()->assign('ary', $ary)->assign('node',$node)->assign('user',$this->user)->assign('json', $json)->assign('link1',Config::get('baseUrl')."/link/".$token_1)->assign('link2',Config::get('baseUrl')."/link/".$token_2)->assign('json_show', $json_show)->assign('ssqr', $ssqr)->assign('ssqr_s_new',$ssqr_s_new)->assign('ssqr_s', $ssqr_s)->assign('surge_base', $surge_base)->assign('surge_proxy', $surge_proxy)->assign('info_server', $ary['server'])->assign('info_port', $this->user->port)->assign('info_method', $ary['method'])->assign('info_pass', $this->user->passwd)->display('user/nodeinfo.tpl');
 				}
 			break; 
 
@@ -1204,22 +1213,6 @@ class UserController extends BaseController
 		return $this->view()->assign('ticketset',$ticketset)->assign("id",$id)->display('user/ticket_view.tpl');
     }
 	
-	public function updateRelay($request, $response, $args)
-    {
-		$relay_enable = $request->getParam('relay_enable');
-        $relay_info = $request->getParam('relay_info');
-        
-        $user = $this->user;
-		
-        
-		$user->relay_enable = $relay_enable;
-        $user->relay_info = $relay_info;
-        $user->save();
-
-        $res['ret'] = 1;
-        $res['msg'] = "修改成功";
-        return $this->echoJson($response, $res);
-    }
 	
 	public function updateWechat($request, $response, $args)
     {

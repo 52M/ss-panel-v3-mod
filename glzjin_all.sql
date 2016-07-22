@@ -121,24 +121,6 @@ CREATE TABLE IF NOT EXISTS `radius_ban` (
 
 -- --------------------------------------------------------
 
---
--- 表的结构 `smartline`
---
-
-CREATE TABLE IF NOT EXISTS `smartline` (
-  `id` bigint(20) NOT NULL,
-  `node_class` bigint(20) NOT NULL,
-  `domain_prefix` text NOT NULL,
-  `type` int(11) DEFAULT '0',
-  `t_node` int(11) DEFAULT NULL,
-  `u_node` int(11) DEFAULT NULL,
-  `c_node` int(11) DEFAULT NULL,
-  `t_id` bigint(20) NOT NULL,
-  `u_id` bigint(20) NOT NULL,
-  `c_id` bigint(20) NOT NULL
-) ENGINE=InnoDB DEFAULT CHARSET=utf8;
-
--- --------------------------------------------------------
 
 --
 -- 表的结构 `speedtest`
@@ -170,7 +152,7 @@ CREATE TABLE IF NOT EXISTS `ss_invite_code` (
   `code` varchar(128) NOT NULL,
   `user_id` int(11) NOT NULL,
   `created_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  `updated_at` timestamp NOT NULL DEFAULT '0000-00-00 00:00:00'
+  `updated_at` timestamp NOT NULL DEFAULT '2016-06-01 00:00:00'
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8;
 
 -- --------------------------------------------------------
@@ -239,17 +221,6 @@ CREATE TABLE IF NOT EXISTS `ss_password_reset` (
   `token` varchar(128) NOT NULL,
   `init_time` int(11) NOT NULL,
   `expire_time` int(11) NOT NULL
-) ENGINE=InnoDB DEFAULT CHARSET=latin1;
-
--- --------------------------------------------------------
-
---
--- 表的结构 `ss_user_admin`
---
-
-CREATE TABLE IF NOT EXISTS `ss_user_admin` (
-  `id` int(11) NOT NULL,
-  `uid` int(11) NOT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=latin1;
 
 -- --------------------------------------------------------
@@ -391,11 +362,6 @@ ALTER TABLE `login_ip`
 ALTER TABLE `radius_ban`
   ADD PRIMARY KEY (`id`);
 
---
--- Indexes for table `smartline`
---
-ALTER TABLE `smartline`
-  ADD PRIMARY KEY (`id`);
 
 --
 -- Indexes for table `speedtest`
@@ -434,11 +400,6 @@ ALTER TABLE `ss_node_online_log`
 ALTER TABLE `ss_password_reset`
   ADD PRIMARY KEY (`id`);
 
---
--- Indexes for table `ss_user_admin`
---
-ALTER TABLE `ss_user_admin`
-  ADD PRIMARY KEY (`id`);
 
 --
 -- Indexes for table `unblockip`
@@ -507,11 +468,6 @@ ALTER TABLE `login_ip`
 ALTER TABLE `radius_ban`
   MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
 --
--- AUTO_INCREMENT for table `smartline`
---
-ALTER TABLE `smartline`
-  MODIFY `id` bigint(20) NOT NULL AUTO_INCREMENT;
---
 -- AUTO_INCREMENT for table `speedtest`
 --
 ALTER TABLE `speedtest`
@@ -542,10 +498,6 @@ ALTER TABLE `ss_node_online_log`
 ALTER TABLE `ss_password_reset`
   MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
 --
--- AUTO_INCREMENT for table `ss_user_admin`
---
-ALTER TABLE `ss_user_admin`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
 --
 -- AUTO_INCREMENT for table `unblockip`
 --
@@ -631,7 +583,6 @@ ALTER TABLE `user` ADD `node_group` INT NOT NULL DEFAULT '0' AFTER `remark`;
 ALTER TABLE `ss_node` ADD `node_group` INT NOT NULL DEFAULT '0' AFTER `node_ip`;
 
 
-ALTER TABLE `smartline` ADD `node_group` INT NOT NULL DEFAULT '0' AFTER `c_id`;
 
 
 CREATE TABLE `payback` ( `id` BIGINT NOT NULL AUTO_INCREMENT , `total` DECIMAL(12,2) NOT NULL , `userid` BIGINT NOT NULL , `ref_by` BIGINT NOT NULL , `ref_get` DECIMAL(12,2) NOT NULL , `datetime` BIGINT NOT NULL , PRIMARY KEY (`id`)) ENGINE = InnoDB;
@@ -678,3 +629,8 @@ ALTER TABLE `user` CHANGE `node_speedlimit` `node_speedlimit` DECIMAL(12,2) NOT 
 
 ALTER TABLE `ss_node` CHANGE `node_speedlimit` `node_speedlimit` DECIMAL(12,2) NOT NULL DEFAULT '0.00';
 
+ALTER TABLE `user`
+  DROP `relay_enable`,
+  DROP `relay_info`;
+ALTER TABLE `user` CHANGE `protocol` `protocol` VARCHAR(128) CHARACTER SET utf8 COLLATE utf8_general_ci NULL DEFAULT 'origin', CHANGE `obfs` `obfs` VARCHAR(128) CHARACTER SET utf8 COLLATE utf8_general_ci NULL DEFAULT 'plain';
+CREATE TABLE `email_verify` ( `id` BIGINT NOT NULL AUTO_INCREMENT , `email` TEXT NOT NULL , `ip` TEXT NOT NULL , `code` TEXT NOT NULL , `expire_in` BIGINT NOT NULL , PRIMARY KEY (`id`)) ENGINE = InnoDB;

@@ -53,6 +53,64 @@
 							<div class="card-main">
 								<div class="card-inner">
 									<div class="card-inner">
+										<p class="card-heading">连接密码修改</p>
+										<p>当前连接密码：{$user->passwd}</p>
+										<div class="form-group form-group-label">
+											<label class="floating-label" for="sspwd">连接密码</label>
+											<input class="form-control" id="sspwd" type="text">
+										</div>
+										
+									</div>
+									<div class="card-action">
+										<div class="card-action-btn pull-left">
+											<button class="btn btn-flat waves-attach" id="ss-pwd-update" ><span class="icon">check</span>&nbsp;提交</button>
+										</div>
+									</div>
+								</div>
+							</div>
+						</div>
+						
+						<div class="card margin-bottom-no">
+							<div class="card-main">
+								<div class="card-inner">
+									<div class="card-inner">
+										<p class="card-heading">加密方式修改</p>
+										<p>当前加密方式：{$user->method}</p>
+										<div class="form-group form-group-label">
+											<label class="floating-label" for="method">加密方式</label>
+											<select id="method" class="form-control">
+												<option value="rc4-md5">RC4-MD5</option>
+												<option value="aes-128-cfb">AES-128-CFB</option>
+												<option value="aes-192-cfb">AES-192-CFB</option>
+												<option value="aes-256-cfb">AES-256-CFB</option>
+												<option value="camellia-128-cfb">CAMELLIA-128-CFB</option>
+												<option value="camellia-192-cfb">CAMELLIA-192-CFB</option>
+												<option value="camellia-256-cfb">CAMELLIA-256-CFB</option>
+												<option value="cast5-cfb">CAST5-CFB</option>
+												<option value="des-cdb">DES-CDB</option>
+												<option value="idea-cfb">IDEA-CFB</option>
+												<option value="rc2-cfb">RC2-CFB</option>
+												<option value="seed-cfb">SEED-CFB</option>
+												<option value="salsa20">SALSA20</option>
+												<option value="chacha20">CHACHA20</option>
+												<option value="chacha20-ietf">CHACHA20-IETF</option>
+											</select>
+										</div>
+										
+									</div>
+									<div class="card-action">
+										<div class="card-action-btn pull-left">
+											<button class="btn btn-flat waves-attach" id="method-update" ><span class="icon">check</span>&nbsp;提交</button>
+										</div>
+									</div>
+								</div>
+							</div>
+						</div>
+
+						<div class="card margin-bottom-no">
+							<div class="card-main">
+								<div class="card-inner">
+									<div class="card-inner">
 										<p class="card-heading">联络方式修改</p>
 										<p>当前联络方式：
 										{if $user->im_type==1}
@@ -93,63 +151,7 @@
 							</div>
 						</div>
 					
-						<div class="card margin-bottom-no">
-							<div class="card-main">
-								<div class="card-inner">
-									<div class="card-inner">
-										<p class="card-heading">连接密码修改</p>
-										<p>当前连接密码：{$user->passwd}</p>
-										<div class="form-group form-group-label">
-											<label class="floating-label" for="sspwd">连接密码</label>
-											<input class="form-control" id="sspwd" type="text">
-										</div>
-										
-									</div>
-									<div class="card-action">
-										<div class="card-action-btn pull-left">
-											<button class="btn btn-flat waves-attach" id="ss-pwd-update" ><span class="icon">check</span>&nbsp;提交</button>
-										</div>
-									</div>
-								</div>
-							</div>
-						</div>
-					
-						<div class="card margin-bottom-no">
-							<div class="card-main">
-								<div class="card-inner">
-									<div class="card-inner">
-										<p class="card-heading">加密方式修改</p>
-										<p>当前加密方式：{$user->method}</p>
-										<div class="form-group form-group-label">
-											<label class="floating-label" for="method">加密方式</label>
-											<select id="method" class="form-control">
-												<option value="rc4-md5">RC4-MD5</option>
-												<option value="aes-128-cfb">AES-128-CFB</option>
-												<option value="aes-192-cfb">AES-192-CFB</option>
-												<option value="aes-256-cfb">AES-256-CFB</option>
-												<option value="camellia-128-cfb">CAMELLIA-128-CFB</option>
-												<option value="camellia-192-cfb">CAMELLIA-192-CFB</option>
-												<option value="camellia-256-cfb">CAMELLIA-256-CFB</option>
-												<option value="cast5-cfb">CAST5-CFB</option>
-												<option value="des-cdb">DES-CDB</option>
-												<option value="idea-cfb">IDEA-CFB</option>
-												<option value="rc2-cfb">RC2-CFB</option>
-												<option value="seed-cfb">SEED-CFB</option>
-												<option value="salsa20">SALSA20</option>
-												<option value="chacha20">CHACHA20</option>
-												<option value="chacha20-ietf">CHACHA20-IETF</option>
-											</select>
-										</div>
-										
-									</div>
-									<div class="card-action">
-										<div class="card-action-btn pull-left">
-											<button class="btn btn-flat waves-attach" id="method-update" ><span class="icon">check</span>&nbsp;提交</button>
-										</div>
-									</div>
-								</div>
-							</div>
-						</div>
+						
 						
 						{if $config['enable_rss']=='true'}
 						<div class="card margin-bottom-no">
@@ -158,7 +160,9 @@
 									<div class="card-inner">
 										<p class="card-heading">RSS 协议&混淆设置</p>
 										<p>当前协议：{$user->protocol}</p>
+										<p>注意：如果需要在手机使用SS请选择带_compatible的兼容选项！</p>
 										<p>当前协议参数：{$user->protocol_param}</p>
+										<p>注意：参数请放空，除非你看得懂<a href="https://github.com/breakwa11/shadowsocks-rss/blob/master/ssr.md">这里</a>！</p>
 										<div class="form-group form-group-label">
 											<label class="floating-label" for="protocol">协议</label>
 											<select id="protocol" class="form-control">
@@ -183,7 +187,9 @@
 									
 									<div class="card-inner">
 										<p>当前混淆方式：{$user->obfs}</p>
+										<p>注意：如果需要在手机使用SS请选择带_compatible的兼容选项！</p>
 										<p>当前混淆参数：{$user->obfs_param}</p>
+										<p>注意：参数请放空，除非你看得懂<a href="https://github.com/breakwa11/shadowsocks-rss/blob/master/ssr.md">这里</a>！</p>
 										<div class="form-group form-group-label">
 											<label class="floating-label" for="obfs">混淆方式</label>
 											<select id="obfs" class="form-control">
@@ -219,36 +225,6 @@
 						{/if}
 						
 						
-						<div class="card margin-bottom-no">
-							<div class="card-main">
-								<div class="card-inner">
-									<div class="card-inner">
-										<p class="card-heading">中转是否启用</p>
-										<p>当前转发状态：{if $user->relay_enable==1}启用{else}禁用{/if}</p>
-										<div class="form-group form-group-label">
-											<label class="floating-label" for="relay_enable">是否启用</label>
-											<select id="relay_enable" class="form-control">
-												<option value="0">禁用</option>
-												<option value="1">启用</option>
-											</select>
-										</div>
-										
-										<p class="card-heading">当前转发信息</p>
-										<p>当前转发信息：{$user->relay_info}</p>
-										<div class="form-group form-group-label">
-											<label class="floating-label" for="relay_info">转发信息（地址 端口）（例如：zhaoj.in 10000）</label>
-											<input class="form-control" id="relay_info" type="text">
-										</div>
-										
-									</div>
-									<div class="card-action">
-										<div class="card-action-btn pull-left">
-											<button class="btn btn-flat waves-attach" id="relay-update" ><span class="icon">check</span>&nbsp;提交</button>
-										</div>
-									</div>
-								</div>
-							</div>
-						</div>
 						
 						
 						
@@ -343,8 +319,8 @@
 										<div class="form-group form-group-label">
 											<label class="floating-label" for="ga-enable">验证设置</label>
 											<select id="ga-enable" class="form-control">
-												<option value="1">要求验证</option>
 												<option value="0">不要求</option>
+												<option value="1">要求验证</option>
 											</select>
 										</div>
 										
