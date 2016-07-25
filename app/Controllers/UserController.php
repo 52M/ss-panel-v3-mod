@@ -203,7 +203,7 @@ class UserController extends BaseController
     {
 		$time = $request->getQueryParams()["time"];
 		$codes = Code::where('userid','=',$this->user->id)->where('usedatetime','>',date('Y-m-d H:i:s',$time))->first();
-		if($codes!=null && strpos($codes->code,"Payment Wall 充值") !== FALSE)
+		if($codes!=null && strpos($codes->code,"充值") !== FALSE)
 		{
 			$res['ret'] = 1;
             return $response->getBody()->write(json_encode($res));
@@ -1398,7 +1398,6 @@ class UserController extends BaseController
 		
 		$email=$user->email;
 		
-		Da::delete($email);
 			
         $passwd = $request->getParam('passwd');
         // check passwd

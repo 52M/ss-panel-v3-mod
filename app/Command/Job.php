@@ -15,6 +15,7 @@ use App\Models\NodeOnlineLog;
 use App\Models\TrafficLog;
 use App\Services\Config;
 use App\Utils\Radius;
+use App\Utils\Wecenter;
 use App\Utils\Tools;
 use App\Services\Mail;
 use App\Utils\QQWry;
@@ -42,7 +43,7 @@ class Job
 	{
 		mkdir('/tmp/ssmodbackup/');
 		
-		system('mysqldump --user='.Config::get('db_username').' --password='.Config::get('db_password').' --host='.Config::get('db_host').' '.Config::get('db_database').' announcement auto blockip bought code coupon disconnect_ip link login_ip payback radius_ban shop speedtest ss_invite_code ss_node ss_password_reset ticket unblockip user user_token> /tmp/ssmodbackup/mod.sql',$ret);
+		system('mysqldump --user='.Config::get('db_username').' --password='.Config::get('db_password').' --host='.Config::get('db_host').' '.Config::get('db_database').' announcement auto blockip bought code coupon disconnect_ip link login_ip payback radius_ban shop speedtest ss_invite_code ss_node ss_password_reset ticket unblockip user user_token email_verify> /tmp/ssmodbackup/mod.sql',$ret);
 		
 		
 		system('mysqldump --opt --user='.Config::get('db_username').' --password='.Config::get('db_password').' --host='.Config::get('db_host').' -d '.Config::get('db_database').' alive_ip ss_node_info ss_node_online_log user_traffic_log >> /tmp/ssmodbackup/mod.sql',$ret);
@@ -237,18 +238,36 @@ class Job
     {
 		//在线人数检测
 		$users = User::where('node_connector','>',0)->get();
+		
+		$full_alive_ips = Ip::where("datetime",">=",time()-60)->get();
+		
+		$alive_ipset = array();
+		
+		foreach($full_alive_ips as $full_alive_ip)
+		{
+			if(!isset($alive_ipset[$full_alive_ip->userid]))
+			{
+				$alive_ipset[$full_alive_ip->userid] = new \ArrayObject();
+			}
+			
+			$alive_ipset[$full_alive_ip->userid]->append($full_alive_ip);
+		}
+		
 		foreach($users as $user)
 		{
-			$alive_ips = Ip::where("datetime",">=",time()-60)->where('userid', '=',$user->id)->get();
-			$ip_count = 0;
+			$alive_ips = (isset($alive_ipset[$user->id])?$alive_ipset[$user->id]:new \ArrayObject());
 			$ips = array();
+			
+			$disconnected_ips = explode(",",$user->disconnect_ip);
+			
 			foreach($alive_ips as $alive_ip)
 			{
-				if(!isset($ips[$alive_ip->ip]))
+				if(!isset($ips[$alive_ip->ip]) && !in_array($alive_ip->ip,$disconnected_ips))
 				{
-					$ip_count++;
+					echo count($ips);
+					echo $alive_ip->ip;
 					$ips[$alive_ip->ip]=1;
-					if($user->node_connector < $ip_count)
+					if($user->node_connector < count($ips))
 					{
 						//暂时封禁
 						$isDisconnect = Disconnect::where('id','=',$alive_ip->ip)->where('userid','=',$user->id)->first();
@@ -300,6 +319,13 @@ class Job
 						$new_ips .= ",".$ip;
 					}
 				}
+			}
+			
+			$user->disconnect_ip = $new_ips;
+			
+			if($new_ips == "")
+			{
+				$user->disconnect_ip = null;
 			}
 			
 			$user->save();
@@ -632,12 +658,84 @@ class Job
 				
 			}
 			
-			
-			if($user->class!=0&&strtotime($user->class_expire)>644447105&&strtotime($user->class_expire)<time())
+			if(strtotime($user->expire_in)<time()&&strtotime($user->expire_in)>=time()-60)
 			{
-				$user->class=0;
-				$user->save();
+				if(Config::get('enable_account_expire_reset')=='true')
+				{
+					$user->transfer_enable = Tools::toGB(Config::get('enable_account_expire_reset_traffic'));
+					$user->u = 0;
+					$user->d = 0;
+					
+					$subject = Config::get('appName')."-您的用户账户已经过期了";
+					$to = $user->email;
+					$text = "您好，系统发现您的账号已经过期了。流量已经被重置为".Config::get('enable_account_expire_reset_traffic').'GB' ;
+					try {
+						Mail::send($to, $subject, 'news/warn.tpl', [
+							"user" => $user,"text" => $text
+						], [
+						]);
+					} catch (Exception $e) {
+						echo $e->getMessage();
+					}
+				}
 			}
+			
+			if(strtotime($user->expire_in)+((int)Config::get('enable_account_expire_delete_days')*86400)<time()&&strtotime($user->expire_in)+((int)Config::get('enable_account_expire_delete_days')*86400)>=time()-60)
+			{
+				if(Config::get('enable_account_expire_delete')=='true')
+				{
+					
+					$subject = Config::get('appName')."-您的用户账户已经被删除了";
+					$to = $user->email;
+					$text = "您好，系统发现您的账号已经过期 ".Config::get('enable_account_expire_delete_days')." 天了，帐号已经被删除。" ;
+					try {
+						Mail::send($to, $subject, 'news/warn.tpl', [
+							"user" => $user,"text" => $text
+						], [
+						]);
+					} catch (Exception $e) {
+						echo $e->getMessage();
+					}
+					
+					Radius::Delete($user->email);
+		
+					RadiusBan::where('userid','=',$user->id)->delete();
+					
+					Wecenter::Delete($user->email);
+					
+					$user->delete();
+					
+					
+					continue;
+				}
+			}
+			
+			if($user->class!=0&&strtotime($user->class_expire)>=time()-60&&strtotime($user->class_expire)<time())
+			{
+				if(Config::get('enable_class_expire_reset')=='true')
+				{
+					$user->transfer_enable = Tools::toGB(Config::get('enable_class_expire_reset_traffic'));
+					$user->u = 0;
+					$user->d = 0;
+					
+					$subject = Config::get('appName')."-您的用户等级已经过期了";
+					$to = $user->email;
+					$text = "您好，系统发现您的账号等级已经过期了。流量已经被重置为".Config::get('enable_class_expire_reset_traffic').'GB' ;
+					try {
+						Mail::send($to, $subject, 'news/warn.tpl', [
+							"user" => $user,"text" => $text
+						], [
+						]);
+					} catch (Exception $e) {
+						echo $e->getMessage();
+					}
+				}
+				
+				$user->class=0;
+				
+			}
+			
+			$user->save();
 		}
 		
 		$rbusers = RadiusBan::all();
