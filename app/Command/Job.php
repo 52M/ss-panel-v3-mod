@@ -13,6 +13,7 @@ use App\Models\Ip;
 use App\Models\NodeInfoLog;
 use App\Models\NodeOnlineLog;
 use App\Models\TrafficLog;
+use App\Models\DetectLog;
 use App\Services\Config;
 use App\Utils\Radius;
 use App\Utils\Wecenter;
@@ -21,6 +22,7 @@ use App\Services\Mail;
 use App\Utils\QQWry;
 use App\Utils\Duoshuo;
 use App\Utils\GA;
+use App\Utils\Telegram;
 use CloudXNS\Api;
 use App\Models\Disconnect;
 
@@ -43,10 +45,10 @@ class Job
 	{
 		mkdir('/tmp/ssmodbackup/');
 		
-		system('mysqldump --user='.Config::get('db_username').' --password='.Config::get('db_password').' --host='.Config::get('db_host').' '.Config::get('db_database').' announcement auto blockip bought code coupon disconnect_ip link login_ip payback radius_ban shop speedtest ss_invite_code ss_node ss_password_reset ticket unblockip user user_token email_verify> /tmp/ssmodbackup/mod.sql',$ret);
+		system('mysqldump --user='.Config::get('db_username').' --password='.Config::get('db_password').' --host='.Config::get('db_host').' '.Config::get('db_database').' announcement auto blockip bought code coupon disconnect_ip link login_ip payback radius_ban shop speedtest ss_invite_code ss_node ss_password_reset ticket unblockip user user_token email_verify detect_list> /tmp/ssmodbackup/mod.sql',$ret);
 		
 		
-		system('mysqldump --opt --user='.Config::get('db_username').' --password='.Config::get('db_password').' --host='.Config::get('db_host').' -d '.Config::get('db_database').' alive_ip ss_node_info ss_node_online_log user_traffic_log >> /tmp/ssmodbackup/mod.sql',$ret);
+		system('mysqldump --opt --user='.Config::get('db_username').' --password='.Config::get('db_password').' --host='.Config::get('db_host').' -d '.Config::get('db_database').' alive_ip ss_node_info ss_node_online_log user_traffic_log detect_log>> /tmp/ssmodbackup/mod.sql',$ret);
 		
 		if(Config::get('enable_radius')=='true')
 		{
@@ -75,6 +77,8 @@ class Job
 		
 		system("rm -rf /tmp/ssmodbackup",$ret);
 		system("rm /tmp/ssmodbackup.zip",$ret);
+		
+		Telegram::Send("备份完毕了喵~今天又是安全祥和的一天呢。");
 		
 	}
 	
@@ -140,6 +144,8 @@ class Job
 			NodeInfoLog::truncate();
 			NodeOnlineLog::truncate();
 			TrafficLog::truncate();
+			DetectLog::truncate();
+			Telegram::Send("姐姐姐姐，数据库被清空，感觉身体被掏空了呢~");
 		}
 		
 		
@@ -175,34 +181,8 @@ class Job
 		{
 			file_put_contents(BASE_PATH."/storage/qqwry.md5",$newmd5);
 			$qqwry = file_get_contents("http://update.cz88.net/ip/qqwry.rar");
-			$key = unpack("V6", $copywrite)[6];
-			for($i=0; $i<0x200; $i++)
+			if($qqwry != "")
 			{
-				$key *= 0x805;
-				$key ++;
-				$key = $key & 0xFF;
-				$qqwry[$i] = chr( ord($qqwry[$i]) ^ $key );
-			}
-			$qqwry = gzuncompress($qqwry);
-			$fp = fopen(BASE_PATH."/app/Utils/qqwry.dat", "wb");
-			if($fp)
-			{
-				fwrite($fp, $qqwry);
-				fclose($fp);
-			}
-			
-			
-		}
-		
-		for($i=0;$i<5;$i++)
-		{
-			$iplocation = new QQWry(); 
-			$location=$iplocation->getlocation("8.8.8.8");
-			$Userlocation = $location['country'];
-			if(iconv('gbk', 'utf-8//IGNORE', $Userlocation)!="美国")
-			{
-				file_put_contents(BASE_PATH."/storage/qqwry.md5",$newmd5);
-				$qqwry = file_get_contents("http://update.cz88.net/ip/qqwry.rar");
 				$key = unpack("V6", $copywrite)[6];
 				for($i=0; $i<0x200; $i++)
 				{
@@ -212,18 +192,23 @@ class Job
 					$qqwry[$i] = chr( ord($qqwry[$i]) ^ $key );
 				}
 				$qqwry = gzuncompress($qqwry);
-				$fp = fopen(BASE_PATH."/app/Utils/qqwry.dat", "wb");
+				rename(BASE_PATH."/storage/qqwry.dat",BASE_PATH."/storage/qqwry.dat.bak");
+				$fp = fopen(BASE_PATH."/storage/qqwry.dat", "wb");
 				if($fp)
 				{
 					fwrite($fp, $qqwry);
 					fclose($fp);
 				}
+			}
+		}
 		
-			}
-			else
-			{
-				break;
-			}
+		$iplocation = new QQWry(); 
+		$location=$iplocation->getlocation("8.8.8.8");
+		$Userlocation = $location['country'];
+		if(iconv('gbk', 'utf-8//IGNORE', $Userlocation)!="美国")
+		{
+			unlink(BASE_PATH."/storage/qqwry.dat");
+			rename(BASE_PATH."/storage/qqwry.dat.bak",BASE_PATH."/storage/qqwry.dat");
 		}
 		
 		if(Config::get('enable_auto_backup') == 'true')
@@ -354,19 +339,11 @@ class Job
 					continue;
 				}
 				
-				if($shop->auto_reset_bandwidth == 1)
-				{
-					$user->u = 0;
-					$user->d = 0;
-					$user->last_day_t = 0;
-					$user->transfer_enable = $shop->bandwidth()*1024*1024*1024;
-				}
-				
 				$user->money=$user->money-$bought->price;
 				
 				$user->save();
 				
-				$shop->buy($user);
+				$shop->buy($user,1);
 				
 				$bought->renew=time()+$shop->auto_renew*86400;
 				$bought->save();
@@ -448,7 +425,7 @@ class Job
 							echo $e->getMessage();
 						}
 						
-						
+						Telegram::Send("姐姐姐姐，面板程序有更新了呢~看看你的邮箱吧~");
 					}
 					
 					$myfile = fopen(BASE_PATH."/storage/update.md5", "w+") or die("Unable to open file!");
@@ -523,6 +500,11 @@ class Job
 								}
 							}
 							
+							Telegram::Send("喵喵喵~ ".$node->name." 节点掉线了喵~域名解析被切换到了 ".$Temp_node->name." 上了喵~");
+						}
+						else
+						{
+							Telegram::Send("喵喵喵~ ".$node->name." 节点掉线了喵~");
 						}
 						
 						
@@ -585,6 +567,12 @@ class Job
 								}
 							}
 							
+							
+							Telegram::Send("喵喵喵~ ".$node->name." 节点恢复了喵~域名解析被切换回来了喵~");
+						}
+						else
+						{
+							Telegram::Send("喵喵喵~ ".$node->name." 节点恢复了喵~");
 						}
 						
 					}
